@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus P2P | Chat Seguro</title>
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Pantalla de Login -->
+        <div id="login-screen" class="screen active">
+            <div class="glass-panel" style="max-width: 450px; text-align: center; margin: 0 auto;">
+                <div class="logo-area">
+                    <span class="logo-icon">👤</span>
+                    <h1>¡Bienvenido!</h1>
+                </div>
+                <p>Ingresa un nombre o alias para que los demás integrantes de la red te reconozcan.</p>
+                <div class="actions">
+                    <input type="text" id="username-input" placeholder="Escribe tu nombre aquí..." autocomplete="off">
+                    <button id="btn-login" class="btn primary">Continuar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de Conexión -->
+        <div id="connection-screen" class="screen">
+            <div class="glass-panel">
+                <div class="logo-area">
+                    <span class="logo-icon">🔗</span>
+                    <h1>Nexus P2P</h1>
+                </div>
+                <p>Comunicación segura, cifrada y sin intermediarios directos a tu navegador.</p>
+                
+                <div class="actions">
+                    <div class="create-room">
+                        <h3>Crear una Sala Privada</h3>
+                        <button id="btn-create" class="btn primary">Generar Código de Sala</button>
+                        <div id="my-id-container" class="hidden">
+                            <p>Comparte este código con la otra persona:</p>
+                            <div class="code-box">
+                                <span id="my-id">Generando...</span>
+                                <button id="btn-copy" class="icon-btn" title="Copiar código">📋</button>
+                            </div>
+                            <div class="loading-pulse">
+                                <span class="pulse-dot"></span> Esperando conexión...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"><span>O ÚNETE A UNA EXISTENTE</span></div>
+
+                    <div class="join-room">
+                        <h3>Unirse a una Sala</h3>
+                        <input type="text" id="join-id" placeholder="Pega el código aquí...">
+                        <button id="btn-join" class="btn secondary">Conectarse</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de Chat -->
+        <div id="chat-screen" class="screen">
+            <div class="chat-container glass-panel">
+                <header class="chat-header">
+                    <div class="peer-info">
+                        <div class="avatar">
+                            <span class="status-indicator online"></span>
+                            👥
+                        </div>
+                        <div class="peer-details">
+                            <h2>Sala Grupal</h2>
+                            <span id="connected-peer-id" class="peer-id-text">Participantes: 1</span>
+                        </div>
+                    </div>
+                    <div class="header-actions" style="display: flex; align-items: center;">
+                        <label title="Sincronizar historial con los nuevos invitados a los que pases este código." style="font-size: 0.8rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.1); margin-right: 15px; height: 100%;">
+                            <input type="checkbox" id="share-history-cb" checked>
+                            <span>Pasar Historial</span>
+                        </label>
+                        <button id="btn-invite" class="btn icon-btn" title="Copiar código de invitación de la sala">📋</button>
+                        <button id="btn-call" class="btn icon-btn" title="Iniciar Videollamada Grupal">📹</button>
+                        <button id="btn-disconnect" class="btn icon-btn danger" title="Abandonar Sala">❌</button>
+                    </div>
+                </header>
+
+                <div class="media-container hidden" id="media-container">
+                    <div class="video-grid" id="video-grid">
+                        <!-- Videos agregados dinámicamente -->
+                    </div>
+                    <button id="btn-end-call" class="btn danger full-width">Salir de la Videollamada</button>
+                </div>
+
+                <div class="chat-messages" id="chat-messages">
+                    <div class="system-message">🔐 Conexión P2P establecida con éxito por WebRTC. La sala es totalmente privada.</div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="file" id="file-input" class="hidden">
+                    <button id="btn-attach" class="btn icon-btn upload-btn" title="Enviar Foto/Video/Archivo">📎</button>
+                    <input type="text" id="message-input" placeholder="Escribe un mensaje seguro..." autocomplete="off">
+                    <button id="btn-send" class="btn primary icon-btn send-btn" title="Enviar">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

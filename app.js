@@ -1,0 +1,530 @@
+// Configuración de PeerJS. Usamos los servidores STUN gratuitos de Google
+const peer = new Peer({
+    config: {'iceServers': [
+        { url: 'stun:stun.l.google.com:19302' },
+        { url: 'stun:stun1.l.google.com:19302' }
+    ]}
+});
+
+let myId = null;
+let myUsername = "Anónimo";
+let connections = {}; // Arreglo para múltiples conexiones Mesh
+let calls = {};       // Arreglo para múltiples videollamadas
+let localStream = null;
+let peerUsernames = {}; // Mapa para guardar los nombres de cada Peer
+let chatHistory = [];   // Historial de mensajes descentralizado
+
+// Elementos del DOM - Pantallas
+const screenLogin = document.getElementById('login-screen');
+const screenConnection = document.getElementById('connection-screen');
+const screenChat = document.getElementById('chat-screen');
+
+// Elementos - Login
+const usernameInput = document.getElementById('username-input');
+const btnLogin = document.getElementById('btn-login');
+
+// Elementos - Conexión
+const btnCreate = document.getElementById('btn-create');
+const myIdContainer = document.getElementById('my-id-container');
+const myIdDisplay = document.getElementById('my-id');
+const btnCopy = document.getElementById('btn-copy');
+const joinIdInput = document.getElementById('join-id');
+const btnJoin = document.getElementById('btn-join');
+
+// Elementos - Chat
+const connectedPeerIdDisplay = document.getElementById('connected-peer-id');
+const chatMessages = document.getElementById('chat-messages');
+const messageInput = document.getElementById('message-input');
+const btnSend = document.getElementById('btn-send');
+const btnDisconnect = document.getElementById('btn-disconnect');
+const btnAttach = document.getElementById('btn-attach');
+const btnInvite = document.getElementById('btn-invite');
+const fileInput = document.getElementById('file-input');
+
+// Elementos - Video
+const btnCall = document.getElementById('btn-call');
+const btnEndCall = document.getElementById('btn-end-call');
+const mediaContainer = document.getElementById('media-container');
+const videoGrid = document.getElementById('video-grid');
+
+/**
+ * =======================
+ * EVENTOS DE PEERJS
+ * =======================
+ */
+
+peer.on('open', (id) => {
+    myId = id;
+    console.log('Mi ID de PeerJS es: ' + id);
+});
+
+// Cuando ALGUIEN se conecta a NOSOTROS
+peer.on('connection', (connection) => {
+    setupConnection(connection, true);
+});
+
+// Cuando alguien llama (Videollamada MESH)
+peer.on('call', (call) => {
+    if (!localStream) {
+        const accept = confirm(`📞 Videollamada entrante de la sala. ¿Deseas encender tu cámara?`);
+        if(accept) {
+            navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
+                startLocalStream(stream);
+                call.answer(stream);
+                setupCallEvents(call);
+            }).catch(err => {
+                console.error(err);
+                alert("No se pudo acceder a la cámara.");
+            });
+        }
+    } else {
+        // Si ya tenemos stream local activo, contestamos automáticamente
+        call.answer(localStream);
+        setupCallEvents(call);
+    }
+});
+
+peer.on('error', (err) => {
+    console.error(err);
+    alert('Error: ' + err.message);
+});
+
+/**
+ * =======================
+ * INTERFAZ: LOGIN
+ * =======================
+ */
+
+function proceedLogin() {
+    const name = usernameInput.value.trim();
+    if (name) {
+        myUsername = name;
+        screenLogin.classList.remove('active');
+        screenConnection.classList.add('active');
+    } else {
+        alert("Por favor, ingresa un nombre o alias.");
+    }
+}
+
+btnLogin.addEventListener('click', proceedLogin);
+usernameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') proceedLogin();
+});
+
+/**
+ * =======================
+ * INTERFAZ: CONEXIÓN
+ * =======================
+ */
+
+btnCreate.addEventListener('click', () => {
+    btnCreate.classList.add('hidden');
+    myIdContainer.classList.remove('hidden');
+    
+    if (myId) {
+        myIdDisplay.textContent = myId;
+    } else {
+        const checkId = setInterval(() => {
+            if(myId) {
+                myIdDisplay.textContent = myId;
+                clearInterval(checkId);
+            }
+        }, 100);
+    }
+});
+
+btnCopy.addEventListener('click', () => {
+    navigator.clipboard.writeText(myId);
+    const icon = btnCopy.textContent;
+    btnCopy.textContent = '✅';
+    setTimeout(() => btnCopy.textContent = icon, 2000);
+});
+
+btnJoin.addEventListener('click', () => {
+    const targetId = joinIdInput.value.trim();
+    if (!targetId) return alert('Por favor, ingresa el código de la sala.');
+    if (targetId === myId) return alert('No puedes conectarte a ti mismo.');
+    if (connections[targetId]) return alert('Ya estás conectado a esta sala.');
+    
+    btnJoin.disabled = true;
+    btnJoin.innerHTML = 'Conectando... <span class="pulse-dot" style="display:inline-block; margin-left:5px"></span>';
+
+    const connection = peer.connect(targetId, { reliable: true, metadata: { isDirectJoin: true } });
+    setupConnection(connection, false);
+});
+
+/**
+ * =======================
+ * TOPOLOGÍA MESH (RED P2P GRUPAL)
+ * =======================
+ */
+
+function setupConnection(conn, isIncoming = false) {
+    conn.on('open', () => {
+        if (!connections[conn.peer]) {
+            connections[conn.peer] = conn;
+            updateRoomUI();
+            
+            // MESH SYNC: Le avisamos al nuevo conectado quiénes más están en la sala
+            // y también nos presentamos enviando nuestro alias.
+            conn.send({ type: 'profile', username: myUsername });
+            
+            // Sincronizar Historial de Chat
+            // SOLO conectamos el historial si nos llamaron directamente con nuestro código, 
+            // y tenemos la casilla de "Pasar Historial" marcada.
+            const shareCb = document.getElementById('share-history-cb');
+            const shouldShareHistory = shareCb ? shareCb.checked : true;
+            const isDirectJoin = conn.metadata && conn.metadata.isDirectJoin;
+
+            if (isIncoming && isDirectJoin && shouldShareHistory && chatHistory.length > 0) {
+                conn.send({ type: 'history_sync', history: chatHistory });
+            }
+
+            const knownPeers = Object.keys(connections).filter(id => id !== conn.peer);
+            if (knownPeers.length > 0) {
+                conn.send({ type: 'mesh_sync', peers: knownPeers });
+            }
+        }
+    });
+
+    conn.on('data', (data) => {
+        if (data.type === 'profile') {
+            peerUsernames[conn.peer] = data.username;
+        }
+        else if (data.type === 'history_sync') {
+            // El primero que nos mandé el historial se queda.
+            if (chatHistory.length === 0 && data.history && data.history.length > 0) {
+                data.history.forEach(msg => {
+                    chatHistory.push(msg); // Lo guardamos localmente
+                    addMessage(msg.content, 'received', msg.senderPseudo, true);
+                });
+                addMessage(`⏳ Se han recuperado ${data.history.length} mensajes previos.`, 'system');
+            }
+        }
+        else if (data.type === 'mesh_sync') {
+            // Un nodo nos notifica de la existencia de otros nodos para armar la malla
+            data.peers.forEach(peerId => {
+                if (peerId !== myId && !connections[peerId]) {
+                    const newConn = peer.connect(peerId, { reliable: true, metadata: { isMeshSync: true } });
+                    setupConnection(newConn, false);
+                }
+            });
+        }
+        else if (data.type === 'text') {
+            chatHistory.push({ content: data.content, senderPseudo: data.senderPseudo });
+            addMessage(data.content, 'received', data.senderPseudo);
+        } 
+        else if (data.type === 'file') {
+            chatHistory.push({ content: `[📎 Archivo Adjunto: ${data.filename}]`, senderPseudo: data.senderPseudo });
+            addFileMessage(data.file, data.filetype, data.filename, 'received', data.senderPseudo);
+        }
+    });
+
+    conn.on('close', () => removePeer(conn.peer));
+    conn.on('error', () => removePeer(conn.peer));
+}
+
+function removePeer(peerId) {
+    if (connections[peerId]) {
+        delete connections[peerId];
+        updateRoomUI();
+    }
+    if (calls[peerId]) {
+        calls[peerId].close();
+        delete calls[peerId];
+    }
+    removeVideoElement(peerId);
+
+    if (Object.keys(connections).length === 0) {
+        resetToConnectionScreen();
+    }
+}
+
+/**
+ * =======================
+ * INTERFAZ: CHAT & MENSAJES
+ * =======================
+ */
+
+function updateRoomUI() {
+    const count = Object.keys(connections).length;
+    if (count > 0 && !screenChat.classList.contains('active')) {
+        screenConnection.classList.remove('active');
+        screenChat.classList.add('active');
+        addMessage("🔐 Conectado a la Sala de forma segura.", "system");
+        
+        btnJoin.disabled = false;
+        btnJoin.textContent = 'Conectarse';
+    }
+    connectedPeerIdDisplay.textContent = `Participantes: ${count + 1}`; // +1 por nosotros
+}
+
+function resetToConnectionScreen() {
+    endAllCalls();
+    Object.values(connections).forEach(c => c.close());
+    connections = {};
+    chatHistory = []; // Vaciamos el historial local
+    
+    screenChat.classList.remove('active');
+    screenConnection.classList.add('active');
+    chatMessages.innerHTML = '';
+    
+    joinIdInput.value = '';
+    btnCreate.classList.remove('hidden');
+    myIdContainer.classList.add('hidden');
+}
+
+btnDisconnect.addEventListener('click', resetToConnectionScreen);
+
+btnInvite.addEventListener('click', () => {
+    navigator.clipboard.writeText(myId);
+    btnInvite.textContent = '✅';
+    setTimeout(() => btnInvite.textContent = '📋', 2000);
+});
+
+function sendMessage() {
+    const text = messageInput.value.trim();
+    if (!text || Object.keys(connections).length === 0) return;
+
+    // Guardar en el historial local
+    chatHistory.push({ content: text, senderPseudo: myUsername });
+
+    // Broadcasting a toda la malla
+    Object.values(connections).forEach(c => {
+        c.send({ type: 'text', content: text, senderPseudo: myUsername });
+    });
+
+    addMessage(text, 'sent', 'Tú');
+    messageInput.value = '';
+}
+
+btnSend.addEventListener('click', sendMessage);
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
+function addMessage(text, type, senderName = '', isHistory = false) {
+    const div = document.createElement('div');
+    div.classList.add('message');
+    if(type !== 'system') div.classList.add(type);
+    
+    // Si es un mensaje cargado del historial, le damos un poco de opacidad baja
+    if (isHistory && type !== 'system') {
+        div.style.opacity = '0.85';
+    }
+
+    if (type === 'system') {
+        div.className = 'system-message';
+        div.textContent = text;
+    } else {
+        if (type === 'received') {
+            div.innerHTML = `<div style="font-size:0.75rem; opacity:0.7; margin-bottom:4px; font-weight: bold;">${senderName}</div>${text}`;
+        } else {
+            div.textContent = text; // sent message
+        }
+    }
+    
+    chatMessages.appendChild(div);
+    scrollToBottom();
+}
+
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * =======================
+ * ENVÍO DE ARCHIVOS
+ * =======================
+ */
+
+btnAttach.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file || Object.keys(connections).length === 0) return;
+
+    const blob = new Blob([file], { type: file.type });
+    const messageDiv = addFileMessage(blob, file.type, file.name, 'sent', 'Tú');
+    
+    // UI de progreso (simplificada para MESH)
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress-bar';
+    progressContainer.appendChild(progressBar);
+    messageDiv.appendChild(progressContainer);
+
+    const safeType = file.type || '';
+    const fileObj = { type: 'file', file: blob, filename: file.name, filetype: safeType, senderPseudo: myUsername };
+    
+    // Guardamos evidencia del archivo en el historial textual (protegiendo el uso de memoria RAM)
+    chatHistory.push({ content: `[📎 Archivo Adjunto: ${file.name}]`, senderPseudo: myUsername });
+
+    // Broadcast Mesh
+    Object.values(connections).forEach(c => c.send(fileObj));
+
+    // Monitoreo del buffer (solo usando la primera conexión como proxy visual)
+    setTimeout(() => {
+        let dc = Object.values(connections)[0]?.dataChannel;
+        if (!dc) {
+            progressContainer.remove();
+            return;
+        }
+        let initialBuffer = dc.bufferedAmount || file.size;
+        const interval = setInterval(() => {
+            const currentBuffer = dc.bufferedAmount;
+            if (currentBuffer === 0) {
+                clearInterval(interval);
+                progressBar.style.width = '100%';
+                setTimeout(() => progressContainer.remove(), 1000);
+            } else {
+                let percent = ((initialBuffer - currentBuffer) / initialBuffer) * 100;
+                progressBar.style.width = Math.max(0, Math.min(99, percent)) + '%';
+            }
+        }, 50);
+    }, 10);
+
+    fileInput.value = ''; 
+});
+
+function addFileMessage(fileData, type, name, sender, senderName = '') {
+    const div = document.createElement('div');
+    div.classList.add('message', sender);
+    
+    let htmlContent = '';
+    if (sender === 'received') {
+        htmlContent = `<div style="font-size:0.75rem; opacity:0.7; margin-bottom:4px; font-weight: bold;">${senderName}</div>`;
+    }
+
+    const safeType = type || '';
+    let blob = fileData;
+    if (!(fileData instanceof Blob)) {
+        blob = new Blob([fileData], { type: safeType });
+    }
+    const url = URL.createObjectURL(blob);
+
+    // Contenedor interno del archivo
+    const mediaDiv = document.createElement('div');
+    if (safeType.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = url;
+        img.onload = () => URL.revokeObjectURL(url);
+        mediaDiv.appendChild(img);
+    } else if (safeType.startsWith('video/')) {
+        const vid = document.createElement('video');
+        vid.src = url;
+        vid.controls = true;
+        mediaDiv.appendChild(vid);
+    } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.className = 'file-download';
+        a.innerHTML = `<span class="file-download-icon">📄</span> ${name}`;
+        mediaDiv.appendChild(a);
+    }
+
+    div.innerHTML = htmlContent;
+    div.appendChild(mediaDiv);
+    
+    chatMessages.appendChild(div);
+    scrollToBottom();
+    return div;
+}
+
+/**
+ * =======================
+ * LÓGICA DE VIDEOLLAMADAS GRID
+ * =======================
+ */
+
+btnCall.addEventListener('click', () => {
+    if (Object.keys(connections).length === 0) return;
+    
+    // Si ya estamos transmitiendo, no hacemos nada
+    if (localStream) return;
+
+    navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
+        startLocalStream(stream);
+        
+        // Llamar a todos los peers de la malla
+        Object.keys(connections).forEach(peerId => {
+            if (!calls[peerId]) {
+                const call = peer.call(peerId, stream);
+                setupCallEvents(call);
+            }
+        });
+    }).catch(err => {
+        alert("Permiso de cámara denegado.");
+    });
+});
+
+function startLocalStream(stream) {
+    localStream = stream;
+    mediaContainer.classList.remove('hidden');
+    addVideoElement('local', stream, 'Tú');
+}
+
+function setupCallEvents(call) {
+    calls[call.peer] = call;
+    call.on('stream', (remoteStream) => {
+        // Mostrar contenedor por si acaso la videollamada era recibida
+        mediaContainer.classList.remove('hidden');
+        let displayedName = peerUsernames[call.peer] || "Amigo";
+        addVideoElement(call.peer, remoteStream, displayedName);
+    });
+    call.on('close', () => {
+        removeVideoElement(call.peer);
+        delete calls[call.peer];
+    });
+}
+
+function addVideoElement(id, stream, labelText) {
+    // Si ya existe, no duplicar (sucede con algunos eventos de WebRTC)
+    if (document.getElementById('video-' + id)) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'video-wrap-' + id;
+    wrapper.className = 'video-wrapper';
+    
+    const video = document.createElement('video');
+    video.id = 'video-' + id;
+    video.srcObject = stream;
+    video.autoplay = true;
+    video.playsInline = true;
+    if (id === 'local') video.muted = true; // No escucharnos a nosotros mismos
+    
+    const label = document.createElement('span');
+    label.className = 'video-label';
+    label.textContent = labelText;
+
+    wrapper.appendChild(video);
+    wrapper.appendChild(label);
+    videoGrid.appendChild(wrapper);
+}
+
+function removeVideoElement(id) {
+    const wrap = document.getElementById('video-wrap-' + id);
+    if (wrap) wrap.remove();
+}
+
+btnEndCall.addEventListener('click', () => {
+    endAllCalls();
+});
+
+function endAllCalls() {
+    // Cerramos todas las conexiones de medios
+    Object.values(calls).forEach(call => call.close());
+    calls = {};
+    
+    // Apagamos cámara local
+    if(localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    // Limpiamos la UI
+    videoGrid.innerHTML = '';
+    mediaContainer.classList.add('hidden');
+}
