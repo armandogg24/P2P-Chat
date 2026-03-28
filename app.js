@@ -1,3 +1,6 @@
+// VERSIÓN Y DEPURA: v2.1 (Para forzar limpieza de cache)
+alert("Nexus P2P v2.1 Inicializada - Si ves esto, el código es el nuevo");
+
 // DIAGNÓSTICO PARA MÓVILES
 window.onerror = function(message, source, lineno, colno, error) {
     alert("❌ ERROR JS: " + message + " (Línea: " + lineno + ")");
@@ -812,15 +815,44 @@ function startLocalStream(stream, isAudioOnly = false) {
     }
 }
 
-function switchNextCamera() {
-    if (videoDevices.length < 2) {
-        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-        startCall(true);
-        return;
-    }
+async function switchNextCamera() {
+    try {
+        console.log("Cambiando cámara...");
+        
+        // 1. Detener el flujo actual antes de pedir el nuevo
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
 
-    currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-    startCall(true, videoDevices[currentDeviceIndex].deviceId);
+        // 2. Lógica simplificada para Android/Chrome: Alternar modo
+        currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+        
+        // 3. Solicitar el nuevo stream directamente con facingMode
+        // Esto es mucho más compatible en móviles que usar deviceId exacto al principio
+        const constraints = {
+            audio: true,
+            video: { facingMode: { ideal: currentFacingMode } }
+        };
+        
+        console.log("Nuevos constraints de cámara:", constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // 4. Actualizar UI local y re-notificar a los peers
+        startLocalStream(stream, false);
+        
+        // 5. Reemplazar tracks en las llamadas activas
+        Object.values(calls).forEach(call => {
+            const pc = call.peerConnection;
+            if (pc) {
+                const videoTrack = stream.getVideoTracks()[0];
+                const videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack);
+            }
+        });
+    } catch (err) {
+        console.error("Error al cambiar cámara:", err);
+        alert("No se pudo cambiar de cámara: " + err.message);
+    }
 }
 
 btnSwitchCamera.addEventListener('click', () => {

@@ -177,11 +177,22 @@
 
     <script src="app.js"></script>
     <script>
-        // Registro del Service Worker para PWA
+        // Registro del Service Worker para PWA con forzado de actualización
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Nexus P2P Service Worker registrado!', reg))
+                .then(reg => {
+                    console.log('Nexus P2P Service Worker registrado!', reg);
+                    // Forzar actualización si hay cambios
+                    reg.onupdatefound = () => {
+                        const installingWorker = reg.installing;
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                window.location.reload();
+                            }
+                        };
+                    };
+                })
                 .catch(err => console.log('Error de registro del Service Worker:', err));
             });
         }

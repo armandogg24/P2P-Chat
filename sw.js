@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexus-p2p-v1';
+const CACHE_NAME = 'nexus-p2p-v0.0.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -20,12 +20,22 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Estrategia de Cache primero, luego Red (Stale-While-Revalidate similar)
+// Estrategia de Red primero, luego Cache (Ideal para desarrollo/testing rápido en PWA)
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+    fetch(event.request)
+      .then((response) => {
+        // Guardar copia fresca en cache si es exitoso
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+        return response;
+      })
+      .catch(() => {
+        // Si falla la red (offline), usar cache
+        return caches.match(event.request);
+      })
   );
 });
 
