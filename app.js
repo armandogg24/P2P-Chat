@@ -93,6 +93,7 @@ const recordingStatus = document.getElementById('recording-status');
 const recordingTimer = document.getElementById('recording-timer');
 const btnDiscardAudio = document.getElementById('btn-discard-audio');
 const btnSendRecordedAudio = document.getElementById('btn-send-recorded');
+const btnAudioCall = document.getElementById('btn-audio-call');
 
 /**
  * =======================
@@ -131,17 +132,24 @@ btnAcceptCall.addEventListener('click', async () => {
     incomingCallOverlay.classList.add('hidden');
     if (pendingCall) {
         try {
-            // Primero intentamos obtener permiso para que aparezcan las cámaras en la lista
-            const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-            startLocalStream(stream); // Esta función no estaba definida explícitamente, pero el código la usaba. La definiremos mejor.
+            // Intentamos obtener audio y video, si falla video, caemos en audio-only
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                startLocalStream(stream, false);
+            } catch (vErr) {
+                console.warn("Fallo cámara, intentando solo audio:", vErr);
+                stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                startLocalStream(stream, true);
+            }
+            
             pendingCall.answer(stream);
             setupCallEvents(pendingCall);
             pendingCall = null;
-            // Actualizar lista de dispositivos después de obtener permiso
             updateDeviceList();
         } catch (err) {
             console.error(err);
-            alert("No se pudo acceder a la cámara o micrófono.");
+            alert("No se pudo acceder al micrófono.");
             pendingCall.close();
             pendingCall = null;
         }
@@ -156,19 +164,28 @@ btnDeclineCall.addEventListener('click', () => {
     }
 });
 
-function startLocalStream(stream) {
-    if (localStream) {
+function startLocalStream(stream, isAudioOnly = false) {
+    if (localStream && localStream !== stream) {
         localStream.getTracks().forEach(track => track.stop());
     }
     localStream = stream;
     mediaContainer.classList.remove('hidden');
     
-    // Actualizar video local en la UI
+    // Aplicar estado de audio-only al contenedor local
+    const localVideoWrap = document.getElementById('video-wrap-local');
+    if (localVideoWrap) {
+        if (isAudioOnly || stream.getVideoTracks().length === 0) {
+            localVideoWrap.classList.add('audio-only');
+        } else {
+            localVideoWrap.classList.remove('audio-only');
+        }
+    }
+
     const localVideo = document.getElementById('video-local');
     if (localVideo) {
         localVideo.srcObject = stream;
     } else {
-        addVideoElement('local', stream, 'Tú');
+        addVideoElement('local', stream, 'Tú', isAudioOnly || stream.getVideoTracks().length === 0);
     }
 }
 
@@ -690,38 +707,68 @@ async function updateDeviceList() {
 btnCall.addEventListener('click', async () => {
     if (Object.keys(connections).length === 0) return;
     if (localStream) return;
-
     await updateDeviceList();
-    startVideoCall();
+    startCall(true);
 });
 
-async function startVideoCall(deviceId = null) {
+btnAudioCall.addEventListener('click', () => {
+    if (Object.keys(connections).length === 0) return;
+    if (localStream) return;
+    startCall(false);
+});
+
+async function startCall(withVideo = true, deviceId = null) {
     try {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+
         let constraints = {
             audio: true,
-            video: true
+            video: withVideo
         };
 
-        if (deviceId) {
-            constraints.video = { deviceId: { exact: deviceId } };
-        } else if (videoDevices.length > 0) {
-            constraints.video = { deviceId: { exact: videoDevices[currentDeviceIndex].deviceId } };
-        } else {
-            constraints.video = { facingMode: currentFacingMode };
+        if (withVideo) {
+            if (deviceId) {
+                constraints.video = { deviceId: { exact: deviceId } };
+            } else if (videoDevices.length > 0) {
+                constraints.video = { deviceId: { exact: videoDevices[currentDeviceIndex].deviceId } };
+            } else {
+                constraints.video = { facingMode: currentFacingMode };
+            }
         }
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        startLocalStream(stream, !withVideo);
         
-        startLocalStream(stream);
-        
-        if (videoDevices.length === 0) {
+        if (withVideo && videoDevices.length === 0) {
             await updateDeviceList();
         }
 
-        const videoTrack = stream.getVideoTracks()[0];
+        // Reemplazar tracks en llamadas activas
         Object.values(calls).forEach(call => {
-            const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-            if (sender) sender.replaceTrack(videoTrack).catch(e => console.error("Error reemplazando track:", e));
+            const pc = call.peerConnection;
+            if (pc) {
+                const senders = pc.getSenders();
+                
+                // Track de Audio
+                const audioTrack = stream.getAudioTracks()[0];
+                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack);
+
+                // Track de Video (si aplica)
+                const videoTrack = stream.getVideoTracks()[0];
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                if (videoSender) {
+                    if (videoTrack) {
+                        videoSender.replaceTrack(videoTrack);
+                    } else {
+                        // Si pasamos a audio-only, podrías querer "detener" el video
+                        // pero replaceTrack(null) no siempre es soportado. 
+                        // Para este MVP, el stream simplemente no tendrá track de video.
+                    }
+                }
+            }
         });
 
         Object.keys(connections).forEach(peerId => {
@@ -732,24 +779,48 @@ async function startVideoCall(deviceId = null) {
         });
     } catch (err) {
         console.error(err);
-        alert("No se pudo acceder a la cámara seleccionada.");
+        alert("Error al acceder a los medios: " + err.message);
+    }
+}
+
+function startLocalStream(stream, isAudioOnly = false) {
+    if (localStream && localStream !== stream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+    localStream = stream;
+    mediaContainer.classList.remove('hidden');
+    
+    const localVideoWrap = document.getElementById('video-wrap-local');
+    if (localVideoWrap) {
+        if (isAudioOnly) localVideoWrap.classList.add('audio-only');
+        else localVideoWrap.classList.remove('audio-only');
+    }
+
+    const localVideo = document.getElementById('video-local');
+    if (localVideo) {
+        localVideo.srcObject = stream;
+    } else {
+        addVideoElement('local', stream, 'Tú', isAudioOnly);
     }
 }
 
 function switchNextCamera() {
     if (videoDevices.length < 2) {
         currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-        startVideoCall();
+        startCall(true);
         return;
     }
 
     currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-    startVideoCall(videoDevices[currentDeviceIndex].deviceId);
+    startCall(true, videoDevices[currentDeviceIndex].deviceId);
 }
 
 btnSwitchCamera.addEventListener('click', () => {
     if (!localStream) return;
-    switchNextCamera();
+    // Solo permitimos cambiar cámara si hay video activo
+    if (localStream.getVideoTracks().length > 0) {
+        switchNextCamera();
+    }
 });
 
 /**
@@ -758,27 +829,47 @@ btnSwitchCamera.addEventListener('click', () => {
  * =======================
  */
 
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/aac',
+        'audio/wav'
+    ];
+    for (let type of types) {
+        if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+}
+
 async function startRecording() {
     if (isRecording) return;
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        const mimeType = getSupportedMimeType();
+        console.log("Usando MIME type para grabación:", mimeType);
+        
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
         audioChunks = [];
         isRecording = true;
 
         mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
         };
 
         mediaRecorder.onstop = () => {
             stream.getTracks().forEach(track => track.stop());
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(100); // Graba en pedazos de 100ms para mayor robustez
         
         // UI: Cambiar a modo grabación
         btnRecord.classList.add('recording');
-        btnRecord.classList.add('hidden'); // Ocultamos el mic mientras grabamos para mostrar los otros
+        btnRecord.classList.add('hidden'); 
         recordingStatus.classList.remove('hidden');
         btnDiscardAudio.classList.remove('hidden');
         btnSendRecordedAudio.classList.remove('hidden');
@@ -795,10 +886,11 @@ async function startRecording() {
 
 function stopRecording(shouldSend = true) {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        const mimeType = mediaRecorder.mimeType;
         mediaRecorder.onstop = () => {
-            if (shouldSend) {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                sendAudioMessage(audioBlob);
+            if (shouldSend && audioChunks.length > 0) {
+                const audioBlob = new Blob(audioChunks, { type: mimeType });
+                sendAudioMessage(audioBlob, mimeType);
             }
             isRecording = false;
         };
@@ -818,37 +910,23 @@ function stopRecording(shouldSend = true) {
     }
 }
 
-function startRecordingTimer() {
-    let seconds = 0;
-    recordingTimer.textContent = "0:00";
-    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
-    recordingTimerInterval = setInterval(() => {
-        seconds++;
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        recordingTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-    }, 1000);
-}
-
-function stopRecordingTimer() {
-    clearInterval(recordingTimerInterval);
-}
-
-function sendAudioMessage(blob) {
+function sendAudioMessage(blob, mimeType) {
     if (Object.keys(connections).length === 0) return;
 
-    const filename = `Audio_${new Date().getTime()}.webm`;
+    const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('webm') ? 'webm' : 'ogg';
+    const filename = `Audio_${new Date().getTime()}.${extension}`;
+    
     const audioObj = { 
         type: 'file', 
         file: blob, 
         filename: filename, 
-        filetype: 'audio/webm', 
+        filetype: mimeType, 
         senderPseudo: myUsername,
         isVoiceNote: true
     };
 
     Object.values(connections).forEach(c => c.send(audioObj));
-    addFileMessage(blob, 'audio/webm', filename, 'sent', 'Tú', true);
+    addFileMessage(blob, mimeType, filename, 'sent', 'Tú', true);
 }
 
 // Eventos de Grabación (Click simple)
@@ -873,10 +951,10 @@ btnSendRecordedAudio.addEventListener('click', () => {
 function setupCallEvents(call) {
     calls[call.peer] = call;
     call.on('stream', (remoteStream) => {
-        // Mostrar contenedor por si acaso la videollamada era recibida
         mediaContainer.classList.remove('hidden');
         let displayedName = peerUsernames[call.peer] || "Amigo";
-        addVideoElement(call.peer, remoteStream, displayedName);
+        const isRemoteAudioOnly = remoteStream.getVideoTracks().length === 0;
+        addVideoElement(call.peer, remoteStream, displayedName, isRemoteAudioOnly);
     });
     call.on('close', () => {
         removeVideoElement(call.peer);
@@ -884,13 +962,13 @@ function setupCallEvents(call) {
     });
 }
 
-function addVideoElement(id, stream, labelText) {
-    // Si ya existe, no duplicar (sucede con algunos eventos de WebRTC)
+function addVideoElement(id, stream, labelText, isAudioOnly = false) {
     if (document.getElementById('video-' + id)) return;
 
     const wrapper = document.createElement('div');
     wrapper.id = 'video-wrap-' + id;
     wrapper.className = 'video-wrapper';
+    if (isAudioOnly) wrapper.classList.add('audio-only');
     
     const video = document.createElement('video');
     video.id = 'video-' + id;
@@ -899,7 +977,6 @@ function addVideoElement(id, stream, labelText) {
     video.playsInline = true;
     if (id === 'local') {
         video.muted = true;
-        // Aplicar efecto espejo si es la cámara frontal por defecto
         if (currentFacingMode === 'user') {
             video.classList.add('facing-user');
         }
