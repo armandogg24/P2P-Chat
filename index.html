@@ -44,6 +44,13 @@
                                 <span id="my-id">Generando...</span>
                                 <button id="btn-copy" class="icon-btn" title="Copiar código">📋</button>
                             </div>
+                            <div class="share-actions" style="display: flex; gap: 10px; margin-top: 10px; justify-content: center;">
+                                <button id="btn-share-link" class="btn secondary" style="flex: 1; font-size: 0.85rem; padding: 8px;">🔗 Enviar Link</button>
+                                <button id="btn-show-qr" class="btn secondary" style="flex: 1; font-size: 0.85rem; padding: 8px;">📱 Código QR</button>
+                            </div>
+                            <div id="qr-container" class="hidden" style="margin-top: 15px; text-align: center;">
+                                <img id="qr-image" src="" alt="Código QR" style="border-radius: 10px; border: 4px solid white; max-width: 150px;">
+                            </div>
                             <div class="loading-pulse">
                                 <span class="pulse-dot"></span> Esperando conexión...
                             </div>

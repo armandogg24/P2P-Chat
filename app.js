@@ -14,6 +14,10 @@ let localStream = null;
 let peerUsernames = {}; // Mapa para guardar los nombres de cada Peer
 let chatHistory = [];   // Historial de mensajes descentralizado
 
+// Lógica de URL para invitaciones automáticas
+const urlParams = new URLSearchParams(window.location.search);
+const roomToJoin = urlParams.get('room');
+
 // Elementos del DOM - Pantallas
 const screenLogin = document.getElementById('login-screen');
 const screenConnection = document.getElementById('connection-screen');
@@ -28,6 +32,10 @@ const btnCreate = document.getElementById('btn-create');
 const myIdContainer = document.getElementById('my-id-container');
 const myIdDisplay = document.getElementById('my-id');
 const btnCopy = document.getElementById('btn-copy');
+const btnShareLink = document.getElementById('btn-share-link');
+const btnShowQr = document.getElementById('btn-show-qr');
+const qrContainer = document.getElementById('qr-container');
+const qrImage = document.getElementById('qr-image');
 const joinIdInput = document.getElementById('join-id');
 const btnJoin = document.getElementById('btn-join');
 
@@ -101,6 +109,12 @@ function proceedLogin() {
         myUsername = name;
         screenLogin.classList.remove('active');
         screenConnection.classList.add('active');
+        
+        // Autoconectar si venimos de un enlace
+        if (roomToJoin) {
+            joinIdInput.value = roomToJoin;
+            btnJoin.click();
+        }
     } else {
         alert("Por favor, ingresa un nombre o alias.");
     }
@@ -139,6 +153,44 @@ btnCopy.addEventListener('click', () => {
     btnCopy.textContent = '✅';
     setTimeout(() => btnCopy.textContent = icon, 2000);
 });
+
+if (btnShareLink) {
+    btnShareLink.addEventListener('click', async () => {
+        const baseUrl = window.location.href.split('?')[0]; 
+        const inviteLink = `${baseUrl}?room=${myId}`;
+        
+        if (navigator.share) {
+            try {
+                // Abre el panel nativo de compartir en celular (WhatsApp, etc.) sin minimizar totalmente el navegador
+                await navigator.share({
+                    title: 'Únete a mi sala P2P',
+                    text: 'Haz clic en este enlace para entrar a nuestro chat privado en Nexus P2P:',
+                    url: inviteLink
+                });
+            } catch (err) {
+                console.log('Error sharing:', err);
+            }
+        } else {
+            navigator.clipboard.writeText(inviteLink);
+            alert('¡Enlace de invitación copiado! Pégalo en tu chat para invitar a tus amigos.');
+        }
+    });
+}
+
+if (btnShowQr) {
+    btnShowQr.addEventListener('click', () => {
+        if (qrContainer.classList.contains('hidden')) {
+            const baseUrl = window.location.href.split('?')[0]; 
+            const inviteLink = `${baseUrl}?room=${myId}`;
+            qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(inviteLink)}&bgcolor=255-255-255`;
+            qrContainer.classList.remove('hidden');
+            btnShowQr.textContent = '📱 Ocultar QR';
+        } else {
+            qrContainer.classList.add('hidden');
+            btnShowQr.textContent = '📱 Código QR';
+        }
+    });
+}
 
 btnJoin.addEventListener('click', () => {
     const targetId = joinIdInput.value.trim();
