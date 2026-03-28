@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus P2P | Chat Seguro</title>
+    <!-- Favicon e Iconos -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    
     <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -106,7 +110,10 @@
                     <div class="video-grid" id="video-grid">
                         <!-- Videos agregados dinámicamente -->
                     </div>
-                    <button id="btn-end-call" class="btn danger full-width">Salir de la Videollamada</button>
+                    <div class="media-controls" style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button id="btn-switch-camera" class="btn secondary" style="flex: 1;">🔄 Cambiar Cámara</button>
+                        <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar</button>
+                    </div>
                 </div>
 
                 <div class="chat-messages" id="chat-messages">

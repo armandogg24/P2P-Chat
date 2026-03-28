@@ -729,6 +729,11 @@ input[type="text"]:focus {
     object-fit: cover;
 }
 
+/* Efecto espejo para la cámara frontal local */
+#video-local.facing-user {
+    transform: scaleX(-1);
+}
+
 .video-label {
     position: absolute;
     bottom: 10px;
@@ -742,6 +747,18 @@ input[type="text"]:focus {
 }
 
 .full-width { width: 100%; }
+
+.media-controls {
+    display: flex;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .media-controls .btn {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+}
 
 /* Animations */
 @keyframes fadeIn {

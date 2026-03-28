@@ -20,6 +20,7 @@ let myUsername = "Anónimo";
 let connections = {}; // Arreglo para múltiples conexiones Mesh
 let calls = {};       // Arreglo para múltiples videollamadas
 let localStream = null;
+let currentFacingMode = 'user'; // 'user' para frontal, 'environment' para trasera
 let peerUsernames = {}; // Mapa para guardar los nombres de cada Peer
 let chatHistory = [];   // Historial de mensajes descentralizado
 
@@ -71,6 +72,7 @@ const lightboxFilename = document.getElementById('lightbox-filename');
 // Elementos - Video
 const btnCall = document.getElementById('btn-call');
 const btnEndCall = document.getElementById('btn-end-call');
+const btnSwitchCamera = document.getElementById('btn-switch-camera');
 const mediaContainer = document.getElementById('media-container');
 const videoGrid = document.getElementById('video-grid');
 
@@ -602,30 +604,67 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
 
 btnCall.addEventListener('click', () => {
     if (Object.keys(connections).length === 0) return;
-    
-    // Si ya estamos transmitiendo, no hacemos nada
     if (localStream) return;
 
-    navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
-        startLocalStream(stream);
+    startVideoCall(currentFacingMode);
+});
+
+async function startVideoCall(facingMode) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode },
+            audio: true
+        });
         
-        // Llamar a todos los peers de la malla
+        if (localStream) {
+            // Si ya hay un stream (al cambiar de cámara), detenemos el anterior
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        
+        localStream = stream;
+        currentFacingMode = facingMode;
+        
+        mediaContainer.classList.remove('hidden');
+        
+        // Actualizar video local en la UI
+        const localVideo = document.getElementById('video-local');
+        if (localVideo) {
+            localVideo.srcObject = stream;
+            // Aplicar clase para efecto espejo solo si es cámara frontal
+            if (facingMode === 'user') {
+                localVideo.classList.add('facing-user');
+            } else {
+                localVideo.classList.remove('facing-user');
+            }
+        } else {
+            addVideoElement('local', stream, 'Tú');
+        }
+
+        // Reemplazar el track de video en todas las llamadas activas (transmitir nueva cámara)
+        const videoTrack = stream.getVideoTracks()[0];
+        Object.values(calls).forEach(call => {
+            const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
+            if (sender) sender.replaceTrack(videoTrack);
+        });
+
+        // Si es la primera vez que llamamos, establecemos las conexiones PeerJS
         Object.keys(connections).forEach(peerId => {
             if (!calls[peerId]) {
                 const call = peer.call(peerId, stream);
                 setupCallEvents(call);
             }
         });
-    }).catch(err => {
-        alert("Permiso de cámara denegado.");
-    });
-});
-
-function startLocalStream(stream) {
-    localStream = stream;
-    mediaContainer.classList.remove('hidden');
-    addVideoElement('local', stream, 'Tú');
+    } catch (err) {
+        console.error(err);
+        alert("No se pudo acceder a la cámara seleccionada.");
+    }
 }
+
+btnSwitchCamera.addEventListener('click', () => {
+    if (!localStream) return;
+    const nextMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    startVideoCall(nextMode);
+});
 
 function setupCallEvents(call) {
     calls[call.peer] = call;
@@ -654,7 +693,13 @@ function addVideoElement(id, stream, labelText) {
     video.srcObject = stream;
     video.autoplay = true;
     video.playsInline = true;
-    if (id === 'local') video.muted = true; // No escucharnos a nosotros mismos
+    if (id === 'local') {
+        video.muted = true;
+        // Aplicar efecto espejo si es la cámara frontal por defecto
+        if (currentFacingMode === 'user') {
+            video.classList.add('facing-user');
+        }
+    }
     
     const label = document.createElement('span');
     label.className = 'video-label';
