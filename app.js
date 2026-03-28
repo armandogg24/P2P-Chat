@@ -1,3 +1,12 @@
+// DIAGNÓSTICO PARA MÓVILES
+window.onerror = function(message, source, lineno, colno, error) {
+    alert("❌ ERROR JS: " + message + " (Línea: " + lineno + ")");
+    return false;
+};
+window.onunhandledrejection = function(event) {
+    alert("❌ Error Promesa: " + event.reason);
+};
+
 const peer = new Peer({
     debug: 2,
     config: {'iceServers': [
@@ -705,22 +714,33 @@ async function updateDeviceList() {
 }
 
 // Unificar botones de llamada con mayor prioridad de ejecución
-const handleStartCall = async (withVideo) => {
-    if (Object.keys(connections).length === 0) {
-        alert("Debes estar conectado a alguien para iniciar una llamada.");
-        return;
+const handleStartCall = (withVideo) => {
+    try {
+        if (Object.keys(connections).length === 0) {
+            alert("⚠️ Debes estar conectado a alguien.");
+            return;
+        }
+        if (localStream) return;
+        
+        if (headerMenu) headerMenu.classList.add('hidden');
+        
+        // Alerta de depuración para confirmar que el clic llegó aquí
+        console.log("Iniciando llamada, conVideo:", withVideo);
+        startCall(withVideo);
+    } catch (e) {
+        alert("Error en handleStartCall: " + e.message);
     }
-    if (localStream) return;
-    
-    // Cerramos el menú antes de pedir permisos para evitar problemas de enfoque
-    headerMenu.classList.add('hidden');
-    
-    if (withVideo) await updateDeviceList();
-    startCall(withVideo);
 };
 
-btnCall.addEventListener('click', () => handleStartCall(true));
-btnAudioCall.addEventListener('click', () => handleStartCall(false));
+// Asignación segura de eventos
+const safeListen = (id, event, callback) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, callback);
+    else console.warn("Elemento no encontrado para listener:", id);
+};
+
+safeListen('btn-call', 'click', () => handleStartCall(true));
+safeListen('btn-audio-call', 'click', () => handleStartCall(false));
 
 async function startCall(withVideo = true, deviceId = null) {
     try {
@@ -805,7 +825,6 @@ function switchNextCamera() {
 
 btnSwitchCamera.addEventListener('click', () => {
     if (!localStream) return;
-    // Solo permitimos cambiar cámara si hay video activo
     if (localStream.getVideoTracks().length > 0) {
         switchNextCamera();
     }
@@ -833,16 +852,15 @@ function getSupportedMimeType() {
 }
 
 // Listener de grabación directo
-btnRecord.addEventListener('click', async () => {
+safeListen('btn-record', 'click', async () => {
     if (isRecording) return;
     
     try {
-        // En móviles Chrome/Android, llamar a getUserMedia lo más cerca posible del click.
+        console.log("Solicitando micro para grabación...");
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         startRecordingWithStream(stream);
     } catch (err) {
-        console.error("Error al obtener permiso micro:", err);
-        alert("No se pudo acceder al micrófono para grabar: " + err.message);
+        alert("❌ No se pudo acceder al micrófono: " + err.message);
     }
 });
 
