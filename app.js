@@ -1,6 +1,3 @@
-// VERSIÓN Y DEPURA: v2.1 (Para forzar limpieza de cache)
-alert("Nexus P2P v2.1 Inicializada - Si ves esto, el código es el nuevo");
-
 // DIAGNÓSTICO PARA MÓVILES
 window.onerror = function(message, source, lineno, colno, error) {
     alert("❌ ERROR JS: " + message + " (Línea: " + lineno + ")");
@@ -929,6 +926,27 @@ async function startRecordingWithStream(stream) {
     } catch (err) {
         console.error("Error MediaRecorder:", err);
         alert("Error de grabador: " + err.message);
+    }
+}
+
+function startRecordingTimer() {
+    let seconds = 0;
+    if (recordingTimer) recordingTimer.textContent = '0:00';
+    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+    recordingTimerInterval = setInterval(() => {
+        seconds++;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        if (recordingTimer) {
+            recordingTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+}
+
+function stopRecordingTimer() {
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
     }
 }
 
