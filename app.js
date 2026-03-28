@@ -704,41 +704,39 @@ async function updateDeviceList() {
     }
 }
 
-btnCall.addEventListener('click', async () => {
-    if (Object.keys(connections).length === 0) return;
+// Unificar botones de llamada con mayor prioridad de ejecución
+const handleStartCall = async (withVideo) => {
+    if (Object.keys(connections).length === 0) {
+        alert("Debes estar conectado a alguien para iniciar una llamada.");
+        return;
+    }
     if (localStream) return;
-    await updateDeviceList();
-    startCall(true);
-});
+    
+    // Cerramos el menú antes de pedir permisos para evitar problemas de enfoque
+    headerMenu.classList.add('hidden');
+    
+    if (withVideo) await updateDeviceList();
+    startCall(withVideo);
+};
 
-btnAudioCall.addEventListener('click', () => {
-    if (Object.keys(connections).length === 0) return;
-    if (localStream) return;
-    startCall(false);
-});
+btnCall.addEventListener('click', () => handleStartCall(true));
+btnAudioCall.addEventListener('click', () => handleStartCall(false));
 
 async function startCall(withVideo = true, deviceId = null) {
     try {
+        // Detener tracks anteriores de forma explícita
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
         }
 
         let constraints = {
             audio: true,
-            video: withVideo
+            video: withVideo ? (deviceId ? { deviceId: { exact: deviceId } } : (videoDevices.length > 0 ? { deviceId: { exact: videoDevices[currentDeviceIndex].deviceId } } : { facingMode: currentFacingMode })) : false
         };
 
-        if (withVideo) {
-            if (deviceId) {
-                constraints.video = { deviceId: { exact: deviceId } };
-            } else if (videoDevices.length > 0) {
-                constraints.video = { deviceId: { exact: videoDevices[currentDeviceIndex].deviceId } };
-            } else {
-                constraints.video = { facingMode: currentFacingMode };
-            }
-        }
-
+        console.log("Iniciando getUserMedia con constraints:", constraints);
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
         startLocalStream(stream, !withVideo);
         
         if (withVideo && videoDevices.length === 0) {
@@ -751,23 +749,13 @@ async function startCall(withVideo = true, deviceId = null) {
             if (pc) {
                 const senders = pc.getSenders();
                 
-                // Track de Audio
                 const audioTrack = stream.getAudioTracks()[0];
                 const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                 if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack);
 
-                // Track de Video (si aplica)
                 const videoTrack = stream.getVideoTracks()[0];
                 const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                if (videoSender) {
-                    if (videoTrack) {
-                        videoSender.replaceTrack(videoTrack);
-                    } else {
-                        // Si pasamos a audio-only, podrías querer "detener" el video
-                        // pero replaceTrack(null) no siempre es soportado. 
-                        // Para este MVP, el stream simplemente no tendrá track de video.
-                    }
-                }
+                if (videoSender && videoTrack) videoSender.replaceTrack(videoTrack);
             }
         });
 
@@ -778,8 +766,8 @@ async function startCall(withVideo = true, deviceId = null) {
             }
         });
     } catch (err) {
-        console.error(err);
-        alert("Error al acceder a los medios: " + err.message);
+        console.error("Error en startCall:", err);
+        alert("Error al acceder a los medios (Cámara/Micro): " + err.message);
     }
 }
 
@@ -844,30 +832,40 @@ function getSupportedMimeType() {
     return '';
 }
 
-async function startRecording() {
+// Listener de grabación directo
+btnRecord.addEventListener('click', async () => {
     if (isRecording) return;
+    
     try {
+        // En móviles Chrome/Android, llamar a getUserMedia lo más cerca posible del click.
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        startRecordingWithStream(stream);
+    } catch (err) {
+        console.error("Error al obtener permiso micro:", err);
+        alert("No se pudo acceder al micrófono para grabar: " + err.message);
+    }
+});
+
+async function startRecordingWithStream(stream) {
+    try {
         const mimeType = getSupportedMimeType();
-        console.log("Usando MIME type para grabación:", mimeType);
+        console.log("Iniciando grabación con mime:", mimeType);
         
         mediaRecorder = new MediaRecorder(stream, { mimeType });
         audioChunks = [];
         isRecording = true;
 
         mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-            }
+            if (event.data.size > 0) audioChunks.push(event.data);
         };
 
         mediaRecorder.onstop = () => {
             stream.getTracks().forEach(track => track.stop());
         };
 
-        mediaRecorder.start(100); // Graba en pedazos de 100ms para mayor robustez
+        mediaRecorder.start(100);
         
-        // UI: Cambiar a modo grabación
+        // UI
         btnRecord.classList.add('recording');
         btnRecord.classList.add('hidden'); 
         recordingStatus.classList.remove('hidden');
@@ -879,8 +877,8 @@ async function startRecording() {
         
         startRecordingTimer();
     } catch (err) {
-        console.error("Error al grabar:", err);
-        alert("No se pudo acceder al micrófono.");
+        console.error("Error MediaRecorder:", err);
+        alert("Error de grabador: " + err.message);
     }
 }
 
@@ -929,23 +927,12 @@ function sendAudioMessage(blob, mimeType) {
     addFileMessage(blob, mimeType, filename, 'sent', 'Tú', true);
 }
 
-// Eventos de Grabación (Click simple)
-btnRecord.addEventListener('click', () => {
-    if (!isRecording) {
-        startRecording();
-    }
-});
-
 btnDiscardAudio.addEventListener('click', () => {
-    if (isRecording) {
-        stopRecording(false);
-    }
+    if (isRecording) stopRecording(false);
 });
 
 btnSendRecordedAudio.addEventListener('click', () => {
-    if (isRecording) {
-        stopRecording(true);
-    }
+    if (isRecording) stopRecording(true);
 });
 
 function setupCallEvents(call) {
