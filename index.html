@@ -109,6 +109,21 @@
                         </div>
                     </div>
                 </header>
+                
+                <!-- Overlay de Llamada Entrante -->
+                <div id="incoming-call-overlay" class="incoming-call-overlay hidden">
+                    <div class="caller-info">
+                        <div class="caller-avatar">📹</div>
+                        <div class="caller-details">
+                            <h3>Llamada entrante...</h3>
+                            <p id="caller-name">Alguien te llama</p>
+                        </div>
+                    </div>
+                    <div class="call-actions">
+                        <button id="btn-accept-call" class="btn-call-action accept" title="Aceptar">📹</button>
+                        <button id="btn-decline-call" class="btn-call-action decline" title="Rechazar">❌</button>
+                    </div>
+                </div>
 
                 <div class="media-container hidden" id="media-container">
                     <div class="video-grid" id="video-grid">
@@ -128,7 +143,11 @@
                     <input type="file" id="file-input" class="hidden">
                     <button id="btn-attach" class="btn icon-btn upload-btn" title="Enviar Foto/Video/Archivo">📎</button>
                     <input type="text" id="message-input" placeholder="Escribe un mensaje seguro..." autocomplete="off">
+                    <button id="btn-record" class="btn icon-btn record-btn" title="Mantener para grabar audio">🎤</button>
                     <button id="btn-send" class="btn primary icon-btn send-btn" title="Enviar">➤</button>
+                </div>
+                <div id="recording-status" class="recording-status hidden">
+                    <span class="pulse-dot red"></span> Grabando... <span id="recording-timer">0:00</span>
                 </div>
             </div>
         </div>

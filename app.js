@@ -20,9 +20,16 @@ let myUsername = "Anónimo";
 let connections = {}; // Arreglo para múltiples conexiones Mesh
 let calls = {};       // Arreglo para múltiples videollamadas
 let localStream = null;
-let currentFacingMode = 'user'; // 'user' para frontal, 'environment' para trasera
+let currentFacingMode = 'user'; // 'user' para frontal, 'environment' para trasera (Legacy)
+let videoDevices = [];         // Lista de cámaras disponibles
+let currentDeviceIndex = 0;    // Índice de la cámara actual
 let peerUsernames = {}; // Mapa para guardar los nombres de cada Peer
 let chatHistory = [];   // Historial de mensajes descentralizado
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingTimerInterval = null;
+let isRecording = false;
+let pendingCall = null;         // Para guardar la llamada entrante mientras se acepta
 
 // Lógica de URL para invitaciones automáticas
 const urlParams = new URLSearchParams(window.location.search);
@@ -76,6 +83,15 @@ const btnSwitchCamera = document.getElementById('btn-switch-camera');
 const mediaContainer = document.getElementById('media-container');
 const videoGrid = document.getElementById('video-grid');
 
+// Nuevos Elementos - Llamadas y Audio
+const incomingCallOverlay = document.getElementById('incoming-call-overlay');
+const callerNameDisplay = document.getElementById('caller-name');
+const btnAcceptCall = document.getElementById('btn-accept-call');
+const btnDeclineCall = document.getElementById('btn-decline-call');
+const btnRecord = document.getElementById('btn-record');
+const recordingStatus = document.getElementById('recording-status');
+const recordingTimer = document.getElementById('recording-timer');
+
 /**
  * =======================
  * EVENTOS DE PEERJS
@@ -95,23 +111,64 @@ peer.on('connection', (connection) => {
 // Cuando alguien llama (Videollamada MESH)
 peer.on('call', (call) => {
     if (!localStream) {
-        const accept = confirm(`📞 Videollamada entrante de la sala. ¿Deseas encender tu cámara?`);
-        if(accept) {
-            navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
-                startLocalStream(stream);
-                call.answer(stream);
-                setupCallEvents(call);
-            }).catch(err => {
-                console.error(err);
-                alert("No se pudo acceder a la cámara.");
-            });
-        }
+        // En lugar de confirm(), mostramos el nuevo overlay
+        pendingCall = call;
+        const callerId = call.peer;
+        const callerName = peerUsernames[callerId] || "Alguien";
+        callerNameDisplay.textContent = `${callerName} quiere iniciar una videollamada`;
+        incomingCallOverlay.classList.remove('hidden');
     } else {
         // Si ya tenemos stream local activo, contestamos automáticamente
         call.answer(localStream);
         setupCallEvents(call);
     }
 });
+
+// Lógica de los botones del Overlay de Llamada
+btnAcceptCall.addEventListener('click', async () => {
+    incomingCallOverlay.classList.add('hidden');
+    if (pendingCall) {
+        try {
+            // Primero intentamos obtener permiso para que aparezcan las cámaras en la lista
+            const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+            startLocalStream(stream); // Esta función no estaba definida explícitamente, pero el código la usaba. La definiremos mejor.
+            pendingCall.answer(stream);
+            setupCallEvents(pendingCall);
+            pendingCall = null;
+            // Actualizar lista de dispositivos después de obtener permiso
+            updateDeviceList();
+        } catch (err) {
+            console.error(err);
+            alert("No se pudo acceder a la cámara o micrófono.");
+            pendingCall.close();
+            pendingCall = null;
+        }
+    }
+});
+
+btnDeclineCall.addEventListener('click', () => {
+    incomingCallOverlay.classList.add('hidden');
+    if (pendingCall) {
+        pendingCall.close();
+        pendingCall = null;
+    }
+});
+
+function startLocalStream(stream) {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+    localStream = stream;
+    mediaContainer.classList.remove('hidden');
+    
+    // Actualizar video local en la UI
+    const localVideo = document.getElementById('video-local');
+    if (localVideo) {
+        localVideo.srcObject = stream;
+    } else {
+        addVideoElement('local', stream, 'Tú');
+    }
+}
 
 peer.on('error', (err) => {
     console.error('Error de Peer:', err);
@@ -302,7 +359,7 @@ function setupConnection(conn, isIncoming = false) {
         } 
         else if (data.type === 'file') {
             chatHistory.push({ content: `[📎 Archivo Adjunto: ${data.filename}]`, senderPseudo: data.senderPseudo });
-            addFileMessage(data.file, data.filetype, data.filename, 'received', data.senderPseudo);
+            addFileMessage(data.file, data.filetype, data.filename, 'received', data.senderPseudo, data.isVoiceNote);
         }
     });
 
@@ -508,7 +565,7 @@ fileInput.addEventListener('change', (e) => {
     fileInput.value = ''; 
 });
 
-function addFileMessage(fileData, type, name, sender, senderName = '') {
+function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNote = false) {
     const div = document.createElement('div');
     div.classList.add('message', sender);
     
@@ -530,7 +587,6 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
     if (safeType.startsWith('image/') || safeType.startsWith('video/')) {
         contentDiv.className = 'media-attachment';
         
-        // Elemento multimedia (miniatura)
         let mediaEl;
         if (safeType.startsWith('image/')) {
             mediaEl = document.createElement('img');
@@ -538,22 +594,20 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
         } else {
             mediaEl = document.createElement('video');
             mediaEl.src = url;
-            mediaEl.muted = true; // Miniatura silenciada
+            mediaEl.muted = true;
         }
         
-        // Botón de descarga independiente (Overlay)
         const dlBtn = document.createElement('a');
         dlBtn.href = url;
         dlBtn.download = name;
         dlBtn.className = 'media-dl-overlay';
         dlBtn.innerHTML = '⬇️';
         dlBtn.title = 'Descargar';
-        dlBtn.onclick = (e) => e.stopPropagation(); // Evitar abrir el lightbox al descargar
+        dlBtn.onclick = (e) => e.stopPropagation();
         
         contentDiv.appendChild(mediaEl);
         contentDiv.appendChild(dlBtn);
         
-        // Abrir Lightbox al hacer clic en la miniatura
         contentDiv.addEventListener('click', () => {
             lightboxMedia.innerHTML = '';
             let bigMedia;
@@ -572,8 +626,27 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
             lightboxFilename.textContent = name;
             lightbox.classList.remove('hidden');
         });
+    } else if (safeType.startsWith('audio/')) {
+        // Manejo de Audio (Música o Nota de Voz)
+        contentDiv.className = 'audio-msg-container';
+        const audio = document.createElement('audio');
+        audio.src = url;
+        audio.controls = true;
+        contentDiv.appendChild(audio);
+
+        if (!isVoiceNote) {
+            // Solo añadir botón de descarga si NO es una nota de voz
+            const dlLink = document.createElement('a');
+            dlLink.href = url;
+            dlLink.download = name;
+            dlLink.className = 'file-dl-btn';
+            dlLink.style.marginTop = '10px';
+            dlLink.style.display = 'flex';
+            dlLink.innerHTML = '⬇️ Descargar';
+            contentDiv.appendChild(dlLink);
+        }
     } else {
-        // Archivo genérico (Documentos, etc)
+        // Archivo genérico
         const dlLink = document.createElement('div');
         dlLink.className = 'file-download';
         
@@ -602,52 +675,53 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
  * =======================
  */
 
-btnCall.addEventListener('click', () => {
+async function updateDeviceList() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log("Cámaras detectadas:", videoDevices);
+    } catch (err) {
+        console.error("Error enumerando dispositivos:", err);
+    }
+}
+
+btnCall.addEventListener('click', async () => {
     if (Object.keys(connections).length === 0) return;
     if (localStream) return;
 
-    startVideoCall(currentFacingMode);
+    await updateDeviceList();
+    startVideoCall();
 });
 
-async function startVideoCall(facingMode) {
+async function startVideoCall(deviceId = null) {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facingMode },
-            audio: true
-        });
-        
-        if (localStream) {
-            // Si ya hay un stream (al cambiar de cámara), detenemos el anterior
-            localStream.getTracks().forEach(track => track.stop());
-        }
-        
-        localStream = stream;
-        currentFacingMode = facingMode;
-        
-        mediaContainer.classList.remove('hidden');
-        
-        // Actualizar video local en la UI
-        const localVideo = document.getElementById('video-local');
-        if (localVideo) {
-            localVideo.srcObject = stream;
-            // Aplicar clase para efecto espejo solo si es cámara frontal
-            if (facingMode === 'user') {
-                localVideo.classList.add('facing-user');
-            } else {
-                localVideo.classList.remove('facing-user');
-            }
+        let constraints = {
+            audio: true,
+            video: true
+        };
+
+        if (deviceId) {
+            constraints.video = { deviceId: { exact: deviceId } };
+        } else if (videoDevices.length > 0) {
+            constraints.video = { deviceId: { exact: videoDevices[currentDeviceIndex].deviceId } };
         } else {
-            addVideoElement('local', stream, 'Tú');
+            constraints.video = { facingMode: currentFacingMode };
         }
 
-        // Reemplazar el track de video en todas las llamadas activas (transmitir nueva cámara)
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        startLocalStream(stream);
+        
+        if (videoDevices.length === 0) {
+            await updateDeviceList();
+        }
+
         const videoTrack = stream.getVideoTracks()[0];
         Object.values(calls).forEach(call => {
-            const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
-            if (sender) sender.replaceTrack(videoTrack);
+            const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) sender.replaceTrack(videoTrack).catch(e => console.error("Error reemplazando track:", e));
         });
 
-        // Si es la primera vez que llamamos, establecemos las conexiones PeerJS
         Object.keys(connections).forEach(peerId => {
             if (!calls[peerId]) {
                 const call = peer.call(peerId, stream);
@@ -660,10 +734,124 @@ async function startVideoCall(facingMode) {
     }
 }
 
+function switchNextCamera() {
+    if (videoDevices.length < 2) {
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        startVideoCall();
+        return;
+    }
+
+    currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+    startVideoCall(videoDevices[currentDeviceIndex].deviceId);
+}
+
 btnSwitchCamera.addEventListener('click', () => {
     if (!localStream) return;
-    const nextMode = currentFacingMode === 'user' ? 'environment' : 'user';
-    startVideoCall(nextMode);
+    switchNextCamera();
+});
+
+/**
+ * =======================
+ * LÓGICA DE AUDIOS (HOLD TO RECORD)
+ * =======================
+ */
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        isRecording = true;
+
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            sendAudioMessage(audioBlob);
+            stream.getTracks().forEach(track => track.stop());
+            isRecording = false;
+        };
+
+        mediaRecorder.start();
+        btnRecord.classList.add('recording');
+        recordingStatus.classList.remove('hidden');
+        startRecordingTimer();
+    } catch (err) {
+        console.error("Error al grabar:", err);
+        alert("No se pudo acceder al micrófono.");
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        btnRecord.classList.remove('recording');
+        recordingStatus.classList.add('hidden');
+        stopRecordingTimer();
+    }
+}
+
+function startRecordingTimer() {
+    let seconds = 0;
+    recordingTimer.textContent = "0:00";
+    recordingTimerInterval = setInterval(() => {
+        seconds++;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        recordingTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+function stopRecordingTimer() {
+    clearInterval(recordingTimerInterval);
+}
+
+function sendAudioMessage(blob) {
+    if (Object.keys(connections).length === 0) return;
+
+    const filename = `Audio_${new Date().getTime()}.webm`;
+    const audioObj = { 
+        type: 'file', 
+        file: blob, 
+        filename: filename, 
+        filetype: 'audio/webm', 
+        senderPseudo: myUsername,
+        isVoiceNote: true // Marcamos como nota de voz
+    };
+
+    // Broadcast Mesh
+    Object.values(connections).forEach(c => c.send(audioObj));
+    
+    // UI Local
+    addFileMessage(blob, 'audio/webm', filename, 'sent', 'Tú', true);
+}
+
+// Eventos "Hold to Record"
+btnRecord.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startRecording();
+});
+
+btnRecord.addEventListener('mouseup', (e) => {
+    e.preventDefault();
+    stopRecording();
+});
+
+btnRecord.addEventListener('mouseleave', (e) => {
+    if (isRecording) stopRecording();
+});
+
+// Soporte Touch para móviles
+btnRecord.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startRecording();
+});
+
+btnRecord.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    stopRecording();
 });
 
 function setupCallEvents(call) {
