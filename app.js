@@ -60,6 +60,14 @@ const fileInput = document.getElementById('file-input');
 const btnMenuToggle = document.getElementById('btn-menu-toggle');
 const headerMenu = document.getElementById('header-menu');
 
+// Elementos - Lightbox
+const lightbox = document.getElementById('media-lightbox');
+const lightboxMedia = document.getElementById('lightbox-media-container');
+const lightboxDownload = document.getElementById('lightbox-download');
+const lightboxClose = document.getElementById('lightbox-close');
+const lightboxOverlay = document.querySelector('.lightbox-overlay');
+const lightboxFilename = document.getElementById('lightbox-filename');
+
 // Elementos - Video
 const btnCall = document.getElementById('btn-call');
 const btnEndCall = document.getElementById('btn-end-call');
@@ -382,6 +390,16 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Lógica de Cierre de Lightbox
+if (lightboxClose) {
+    const closeLightbox = () => {
+        lightbox.classList.add('hidden');
+        lightboxMedia.innerHTML = '';
+    };
+    lightboxClose.addEventListener('click', closeLightbox);
+    lightboxOverlay.addEventListener('click', closeLightbox);
+}
+
 function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || Object.keys(connections).length === 0) return;
@@ -492,9 +510,9 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
     const div = document.createElement('div');
     div.classList.add('message', sender);
     
-    let htmlContent = '';
+    let senderHtml = '';
     if (sender === 'received') {
-        htmlContent = `<div style="font-size:0.75rem; opacity:0.7; margin-bottom:4px; font-weight: bold;">${senderName}</div>`;
+        senderHtml = `<div style="font-size:0.75rem; opacity:0.7; margin-bottom:4px; font-weight: bold;">${senderName}</div>`;
     }
 
     const safeType = type || '';
@@ -505,28 +523,71 @@ function addFileMessage(fileData, type, name, sender, senderName = '') {
     const url = URL.createObjectURL(blob);
 
     // Contenedor interno del archivo
-    const mediaDiv = document.createElement('div');
-    if (safeType.startsWith('image/')) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.onload = () => URL.revokeObjectURL(url);
-        mediaDiv.appendChild(img);
-    } else if (safeType.startsWith('video/')) {
-        const vid = document.createElement('video');
-        vid.src = url;
-        vid.controls = true;
-        mediaDiv.appendChild(vid);
+    const contentDiv = document.createElement('div');
+    
+    if (safeType.startsWith('image/') || safeType.startsWith('video/')) {
+        contentDiv.className = 'media-attachment';
+        
+        // Elemento multimedia (miniatura)
+        let mediaEl;
+        if (safeType.startsWith('image/')) {
+            mediaEl = document.createElement('img');
+            mediaEl.src = url;
+        } else {
+            mediaEl = document.createElement('video');
+            mediaEl.src = url;
+            mediaEl.muted = true; // Miniatura silenciada
+        }
+        
+        // Botón de descarga independiente (Overlay)
+        const dlBtn = document.createElement('a');
+        dlBtn.href = url;
+        dlBtn.download = name;
+        dlBtn.className = 'media-dl-overlay';
+        dlBtn.innerHTML = '⬇️';
+        dlBtn.title = 'Descargar';
+        dlBtn.onclick = (e) => e.stopPropagation(); // Evitar abrir el lightbox al descargar
+        
+        contentDiv.appendChild(mediaEl);
+        contentDiv.appendChild(dlBtn);
+        
+        // Abrir Lightbox al hacer clic en la miniatura
+        contentDiv.addEventListener('click', () => {
+            lightboxMedia.innerHTML = '';
+            let bigMedia;
+            if (safeType.startsWith('image/')) {
+                bigMedia = document.createElement('img');
+                bigMedia.src = url;
+            } else {
+                bigMedia = document.createElement('video');
+                bigMedia.src = url;
+                bigMedia.controls = true;
+                bigMedia.autoplay = true;
+            }
+            lightboxMedia.appendChild(bigMedia);
+            lightboxDownload.href = url;
+            lightboxDownload.download = name;
+            lightboxFilename.textContent = name;
+            lightbox.classList.remove('hidden');
+        });
     } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name;
-        a.className = 'file-download';
-        a.innerHTML = `<span class="file-download-icon">📄</span> ${name}`;
-        mediaDiv.appendChild(a);
+        // Archivo genérico (Documentos, etc)
+        const dlLink = document.createElement('div');
+        dlLink.className = 'file-download';
+        
+        dlLink.innerHTML = `
+            <div class="file-info">
+                <span class="file-download-icon">📄</span>
+                <span class="file-name">${name}</span>
+            </div>
+            <a href="${url}" download="${name}" class="file-dl-btn" title="Descargar">⬇️</a>
+        `;
+        
+        contentDiv.appendChild(dlLink);
     }
 
-    div.innerHTML = htmlContent;
-    div.appendChild(mediaDiv);
+    div.innerHTML = senderHtml;
+    div.appendChild(contentDiv);
     
     chatMessages.appendChild(div);
     scrollToBottom();

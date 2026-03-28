@@ -122,6 +122,24 @@
             </div>
         </div>
     </div>
+
+    <!-- Lightbox de Previsualización Multimedia -->
+    <div id="media-lightbox" class="lightbox hidden">
+        <div class="lightbox-overlay"></div>
+        <div class="lightbox-content">
+            <header class="lightbox-header">
+                <span id="lightbox-filename" class="filename">Archivo</span>
+                <div class="lightbox-actions">
+                    <a id="lightbox-download" href="#" download class="btn icon-btn" title="Descargar">⬇️</a>
+                    <button id="lightbox-close" class="btn icon-btn" title="Cerrar">✕</button>
+                </div>
+            </header>
+            <div id="lightbox-media-container" class="media-preview-box">
+                <!-- Se inserta img o video dinámicamente -->
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
