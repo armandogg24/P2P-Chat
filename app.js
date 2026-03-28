@@ -1,12 +1,3 @@
-// DIAGNÓSTICO PARA MÓVILES
-window.onerror = function(message, source, lineno, colno, error) {
-    alert("❌ ERROR JS: " + message + " (Línea: " + lineno + ")");
-    return false;
-};
-window.onunhandledrejection = function(event) {
-    alert("❌ Error Promesa: " + event.reason);
-};
-
 const peer = new Peer({
     debug: 2,
     config: {'iceServers': [

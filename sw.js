@@ -18,6 +18,7 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting(); // Forzar activación inmediata
 });
 
 // Estrategia de Red primero, luego Cache (Ideal para desarrollo/testing rápido en PWA)
@@ -52,4 +53,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim(); // Tomar control de las pestañas abiertas inmediatamente
 });
