@@ -91,6 +91,8 @@ const btnDeclineCall = document.getElementById('btn-decline-call');
 const btnRecord = document.getElementById('btn-record');
 const recordingStatus = document.getElementById('recording-status');
 const recordingTimer = document.getElementById('recording-timer');
+const btnDiscardAudio = document.getElementById('btn-discard-audio');
+const btnSendRecordedAudio = document.getElementById('btn-send-recorded');
 
 /**
  * =======================
@@ -757,6 +759,7 @@ btnSwitchCamera.addEventListener('click', () => {
  */
 
 async function startRecording() {
+    if (isRecording) return;
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
@@ -768,15 +771,21 @@ async function startRecording() {
         };
 
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            sendAudioMessage(audioBlob);
             stream.getTracks().forEach(track => track.stop());
-            isRecording = false;
         };
 
         mediaRecorder.start();
+        
+        // UI: Cambiar a modo grabación
         btnRecord.classList.add('recording');
+        btnRecord.classList.add('hidden'); // Ocultamos el mic mientras grabamos para mostrar los otros
         recordingStatus.classList.remove('hidden');
+        btnDiscardAudio.classList.remove('hidden');
+        btnSendRecordedAudio.classList.remove('hidden');
+        messageInput.classList.add('hidden');
+        btnAttach.classList.add('hidden');
+        btnSend.classList.add('hidden');
+        
         startRecordingTimer();
     } catch (err) {
         console.error("Error al grabar:", err);
@@ -784,11 +793,27 @@ async function startRecording() {
     }
 }
 
-function stopRecording() {
+function stopRecording(shouldSend = true) {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.onstop = () => {
+            if (shouldSend) {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                sendAudioMessage(audioBlob);
+            }
+            isRecording = false;
+        };
         mediaRecorder.stop();
+        
+        // UI: Volver al estado normal
         btnRecord.classList.remove('recording');
+        btnRecord.classList.remove('hidden');
         recordingStatus.classList.add('hidden');
+        btnDiscardAudio.classList.add('hidden');
+        btnSendRecordedAudio.classList.add('hidden');
+        messageInput.classList.remove('hidden');
+        btnAttach.classList.remove('hidden');
+        btnSend.classList.remove('hidden');
+        
         stopRecordingTimer();
     }
 }
@@ -796,6 +821,7 @@ function stopRecording() {
 function startRecordingTimer() {
     let seconds = 0;
     recordingTimer.textContent = "0:00";
+    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
     recordingTimerInterval = setInterval(() => {
         seconds++;
         const mins = Math.floor(seconds / 60);
@@ -818,40 +844,30 @@ function sendAudioMessage(blob) {
         filename: filename, 
         filetype: 'audio/webm', 
         senderPseudo: myUsername,
-        isVoiceNote: true // Marcamos como nota de voz
+        isVoiceNote: true
     };
 
-    // Broadcast Mesh
     Object.values(connections).forEach(c => c.send(audioObj));
-    
-    // UI Local
     addFileMessage(blob, 'audio/webm', filename, 'sent', 'Tú', true);
 }
 
-// Eventos "Hold to Record"
-btnRecord.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    startRecording();
+// Eventos de Grabación (Click simple)
+btnRecord.addEventListener('click', () => {
+    if (!isRecording) {
+        startRecording();
+    }
 });
 
-btnRecord.addEventListener('mouseup', (e) => {
-    e.preventDefault();
-    stopRecording();
+btnDiscardAudio.addEventListener('click', () => {
+    if (isRecording) {
+        stopRecording(false);
+    }
 });
 
-btnRecord.addEventListener('mouseleave', (e) => {
-    if (isRecording) stopRecording();
-});
-
-// Soporte Touch para móviles
-btnRecord.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    startRecording();
-});
-
-btnRecord.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    stopRecording();
+btnSendRecordedAudio.addEventListener('click', () => {
+    if (isRecording) {
+        stopRecording(true);
+    }
 });
 
 function setupCallEvents(call) {

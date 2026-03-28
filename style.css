@@ -899,18 +899,27 @@ input[type="text"]:focus {
 }
 
 .recording-status {
-    background: rgba(239, 68, 68, 0.15);
+    flex: 1;
+    background: transparent;
     color: #ef4444;
-    padding: 8px 15px;
-    border-radius: 12px;
-    font-size: 0.85rem;
+    padding: 0 10px;
+    font-size: 0.9rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 10px;
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: none;
     animation: fadeIn 0.3s ease;
+}
+
+.danger-btn {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #ef4444 !important;
+}
+
+.danger-btn:hover {
+    background: #ef4444 !important;
+    color: white !important;
 }
 
 .pulse-dot.red { background: #ef4444; }
