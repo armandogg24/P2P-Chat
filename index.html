@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus P2P | Chat Seguro</title>
-    <!-- Favicon e Iconos -->
+    <!-- PWA / Favicon e Iconos -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="favicon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -148,5 +152,15 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Registro del Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Nexus P2P Service Worker registrado!', reg))
+                .catch(err => console.log('Error de registro del Service Worker:', err));
+            });
+        }
+    </script>
 </body>
 </html>
