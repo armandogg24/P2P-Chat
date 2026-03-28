@@ -82,14 +82,23 @@
                             <span id="connected-peer-id" class="peer-id-text">Participantes: 1</span>
                         </div>
                     </div>
-                    <div class="header-actions" style="display: flex; align-items: center;">
-                        <label title="Sincronizar historial con los nuevos invitados a los que pases este código." style="font-size: 0.8rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.1); margin-right: 15px; height: 100%;">
-                            <input type="checkbox" id="share-history-cb" checked>
-                            <span>Pasar Historial</span>
-                        </label>
-                        <button id="btn-invite" class="btn icon-btn" title="Copiar código de invitación de la sala">📋</button>
-                        <button id="btn-call" class="btn icon-btn" title="Iniciar Videollamada Grupal">📹</button>
-                        <button id="btn-disconnect" class="btn icon-btn danger" title="Abandonar Sala">❌</button>
+                    <div class="header-actions">
+                        <button id="btn-menu-toggle" class="btn icon-btn" title="Opciones">⋮</button>
+                        <div id="header-menu" class="header-menu hidden">
+                            <label class="menu-item share-history-label">
+                                <input type="checkbox" id="share-history-cb" checked>
+                                <span>Pasar Historial</span>
+                            </label>
+                            <button id="btn-invite" class="menu-item-btn" title="Copiar código de invitación">
+                                <span class="icon">📋</span> Copiar Invitación
+                            </button>
+                            <button id="btn-call" class="menu-item-btn" title="Iniciar Videollamada">
+                                <span class="icon">📹</span> Videollamada
+                            </button>
+                            <button id="btn-disconnect" class="menu-item-btn danger" title="Abandonar Sala">
+                                <span class="icon">❌</span> Salir de la Sala
+                            </button>
+                        </div>
                     </div>
                 </header>
 

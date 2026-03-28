@@ -288,15 +288,93 @@ input[type="text"]:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 20px;
+    padding-bottom: 15px;
     border-bottom: 1px solid var(--glass-border);
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    position: relative; /* Para que el menú se posicione relativo a la cabecera */
 }
 
 .peer-info {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
+    min-width: 0; /* Permitir que se encoja */
+}
+
+.header-actions {
+    position: relative;
+    display: flex;
+    gap: 10px;
+}
+
+.header-menu {
+    position: absolute;
+    top: 55px;
+    right: 0;
+    width: 200px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    z-index: 1000;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+    animation: fadeIn 0.2s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.2s;
+    user-select: none;
+}
+
+.menu-item:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.menu-item-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 10px;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.menu-item-btn:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.menu-item-btn.danger {
+    color: #ef4444;
+}
+
+.menu-item-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.menu-item-btn .icon {
+    font-size: 1.1rem;
+    width: 20px;
+    text-align: center;
 }
 
 .avatar {
@@ -415,11 +493,21 @@ input[type="text"]:focus {
 
 .chat-input-area {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
-    background: rgba(0,0,0,0.2);
-    padding: 8px;
+    background: rgba(0,0,0,0.25);
+    padding: 8px 12px;
     border-radius: 20px;
+    margin-top: auto;
+    /* Margin inferior seguro para evitar cortes en móviles con barras de gestos */
+    margin-bottom: 5px;
+}
+
+@media (min-width: 768px) {
+    .chat-input-area {
+        padding: 10px 15px;
+        margin-bottom: 10px;
+    }
 }
 
 .chat-input-area input[type="text"] {

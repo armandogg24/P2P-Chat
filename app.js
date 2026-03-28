@@ -57,6 +57,8 @@ const btnDisconnect = document.getElementById('btn-disconnect');
 const btnAttach = document.getElementById('btn-attach');
 const btnInvite = document.getElementById('btn-invite');
 const fileInput = document.getElementById('file-input');
+const btnMenuToggle = document.getElementById('btn-menu-toggle');
+const headerMenu = document.getElementById('header-menu');
 
 // Elementos - Video
 const btnCall = document.getElementById('btn-call');
@@ -352,8 +354,32 @@ btnDisconnect.addEventListener('click', resetToConnectionScreen);
 
 btnInvite.addEventListener('click', () => {
     navigator.clipboard.writeText(myId);
-    btnInvite.textContent = '✅';
-    setTimeout(() => btnInvite.textContent = '📋', 2000);
+    const originalText = btnInvite.innerHTML;
+    btnInvite.innerHTML = '<span class="icon">✅</span> Copiado';
+    setTimeout(() => {
+        btnInvite.innerHTML = originalText;
+        headerMenu.classList.add('hidden');
+    }, 2000);
+});
+
+// Lógica del Menú Desplegable
+if (btnMenuToggle) {
+    btnMenuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        headerMenu.classList.toggle('hidden');
+    });
+}
+
+// Cerrar menú al hacer clic en cualquier botón de acción (excepto el de invitar que tiene delay)
+document.querySelectorAll('.menu-item-btn:not(#btn-invite)').forEach(btn => {
+    btn.addEventListener('click', () => headerMenu.classList.add('hidden'));
+});
+
+// Cerrar menú al hacer clic fuera
+document.addEventListener('click', (e) => {
+    if (headerMenu && !headerMenu.contains(e.target) && e.target !== btnMenuToggle) {
+        headerMenu.classList.add('hidden');
+    }
 });
 
 function sendMessage() {
