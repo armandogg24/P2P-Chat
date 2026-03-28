@@ -1,10 +1,19 @@
-// Configuración de PeerJS. Usamos los servidores STUN gratuitos de Google
 const peer = new Peer({
+    debug: 2,
     config: {'iceServers': [
         { url: 'stun:stun.l.google.com:19302' },
-        { url: 'stun:stun1.l.google.com:19302' }
+        { url: 'stun:stun1.l.google.com:19302' },
+        { url: 'stun:stun2.l.google.com:19302' }
     ]}
 });
+
+// Mantener la conexión activa (ping al servidor de señalización)
+setInterval(() => {
+    if (peer.disconnected) {
+        console.warn('Peer desconectado del servidor. Intentando reconectar...');
+        peer.reconnect();
+    }
+}, 5000);
 
 let myId = null;
 let myUsername = "Anónimo";
@@ -93,8 +102,21 @@ peer.on('call', (call) => {
 });
 
 peer.on('error', (err) => {
-    console.error(err);
-    alert('Error: ' + err.message);
+    console.error('Error de Peer:', err);
+    if (err.type === 'disconnected' || err.type === 'network' || err.type === 'server-error') {
+        console.warn(`Error de red (${err.type}). Intentando reconectar...`);
+        setTimeout(() => {
+            if (peer.disconnected) peer.reconnect();
+        }, 3000);
+    } else {
+        alert('Error: ' + err.message);
+    }
+});
+
+// Evento cuando se pierde la conexión con el servidor de señalización (pero el ID sigue siendo válido)
+peer.on('disconnected', () => {
+    console.warn('Desconectado del servidor de señalización. Intentando reconectar...');
+    peer.reconnect();
 });
 
 /**
