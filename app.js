@@ -1019,6 +1019,12 @@ function startLocalStream(stream, isAudioOnly = false) {
     const localVideo = document.getElementById('video-local');
     if (localVideo) {
         localVideo.srcObject = stream;
+        // Actualizar efecto espejo según el tipo de cámara actual
+        if (currentFacingMode === 'user') {
+            localVideo.classList.add('facing-user');
+        } else {
+            localVideo.classList.remove('facing-user');
+        }
     } else {
         addVideoElement('local', stream, 'Tú', isAudioOnly);
     }
