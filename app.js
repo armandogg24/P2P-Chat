@@ -29,7 +29,10 @@ let mediaRecorder = null;
 let audioChunks = [];
 let recordingTimerInterval = null;
 let isRecording = false;
-let pendingCall = null;         // Para guardar la llamada entrante mientras se acepta
+let pendingCall = null;
+let roomName = ""; // Nombre personalizado de la sala
+let shareHistoryWithNext = true; // Control de historial vía overlay
+let html5QrCode = null; // Instancia del escáner QR
 
 // Lógica de URL para invitaciones automáticas
 const urlParams = new URLSearchParams(window.location.search);
@@ -53,8 +56,18 @@ const btnShareLink = document.getElementById('btn-share-link');
 const btnShowQr = document.getElementById('btn-show-qr');
 const qrContainer = document.getElementById('qr-container');
 const qrImage = document.getElementById('qr-image');
+const roomNameInput = document.getElementById('room-name-input');
+const btnScanQr = document.getElementById('btn-scan-qr');
 const joinIdInput = document.getElementById('join-id');
 const btnJoin = document.getElementById('btn-join');
+
+// Elementos - Modales
+const shareModal = document.getElementById('share-modal');
+const scannerModal = document.getElementById('scanner-modal');
+const btnCloseScanner = document.getElementById('btn-close-scanner');
+const btnCloseShare = document.getElementById('btn-close-share');
+const btnShareWithHistory = document.getElementById('btn-share-with-history');
+const btnShareNoHistory = document.getElementById('btn-share-no-history');
 
 // Elementos - Chat
 const connectedPeerIdDisplay = document.getElementById('connected-peer-id');
@@ -242,7 +255,10 @@ usernameInput.addEventListener('keypress', (e) => {
  */
 
 btnCreate.addEventListener('click', () => {
+    roomName = roomNameInput.value.trim() || "Sala Privada";
+    document.querySelector('.peer-details h2').textContent = roomName;
     btnCreate.classList.add('hidden');
+    roomNameInput.classList.add('hidden');
     myIdContainer.classList.remove('hidden');
     
     if (myId) {
@@ -292,6 +308,7 @@ if (btnShowQr) {
         if (qrContainer.classList.contains('hidden')) {
             const baseUrl = window.location.href.split('?')[0]; 
             const inviteLink = `${baseUrl}?room=${myId}`;
+            // QR simple usando API externa
             qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(inviteLink)}&bgcolor=255-255-255`;
             qrContainer.classList.remove('hidden');
             btnShowQr.textContent = '📱 Ocultar QR';
@@ -301,6 +318,57 @@ if (btnShowQr) {
         }
     });
 }
+
+// Lógica de Escaneo QR
+if (btnScanQr) {
+    btnScanQr.addEventListener('click', () => {
+        scannerModal.classList.remove('hidden');
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("qr-reader");
+        }
+        
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            console.log("QR Scanned:", decodedText);
+            // Si el QR contiene una URL con ?room=ID
+            try {
+                const url = new URL(decodedText);
+                const roomId = url.searchParams.get('room');
+                if (roomId) {
+                    joinIdInput.value = roomId;
+                    stopScanner();
+                    btnJoin.click();
+                } else {
+                    // Si el QR es solo el ID directamente
+                    joinIdInput.value = decodedText;
+                    stopScanner();
+                    btnJoin.click();
+                }
+            } catch (e) {
+                // Si no es una URL válida, asumimos que es el ID
+                joinIdInput.value = decodedText;
+                stopScanner();
+                btnJoin.click();
+            }
+        }).catch(err => {
+            console.error("Error al iniciar el escáner:", err);
+            alert("No se pudo acceder a la cámara o el escáner ya está en uso.");
+            scannerModal.classList.add('hidden');
+        });
+    });
+}
+
+function stopScanner() {
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+            scannerModal.classList.add('hidden');
+        }).catch(err => console.error("Error stop scanner:", err));
+    } else {
+        scannerModal.classList.add('hidden');
+    }
+}
+
+btnCloseScanner.addEventListener('click', stopScanner);
 
 btnJoin.addEventListener('click', () => {
     const targetId = joinIdInput.value.trim();
@@ -329,16 +397,13 @@ function setupConnection(conn, isIncoming = false) {
             
             // MESH SYNC: Le avisamos al nuevo conectado quiénes más están en la sala
             // y también nos presentamos enviando nuestro alias.
-            conn.send({ type: 'profile', username: myUsername });
+            conn.send({ type: 'profile', username: myUsername, roomName: roomName });
             
             // Sincronizar Historial de Chat
-            // SOLO conectamos el historial si nos llamaron directamente con nuestro código, 
-            // y tenemos la casilla de "Pasar Historial" marcada.
-            const shareCb = document.getElementById('share-history-cb');
-            const shouldShareHistory = shareCb ? shareCb.checked : true;
+            // Usamos la variable global shareHistoryWithNext que se configuró al compartir el link
             const isDirectJoin = conn.metadata && conn.metadata.isDirectJoin;
 
-            if (isIncoming && isDirectJoin && shouldShareHistory && chatHistory.length > 0) {
+            if (isIncoming && isDirectJoin && shareHistoryWithNext && chatHistory.length > 0) {
                 conn.send({ type: 'history_sync', history: chatHistory });
             }
 
@@ -352,6 +417,11 @@ function setupConnection(conn, isIncoming = false) {
     conn.on('data', (data) => {
         if (data.type === 'profile') {
             peerUsernames[conn.peer] = data.username;
+            // Si el peer que nos contacta trae el nombre de la sala y aún no tenemos uno amigable, lo usamos
+            if (data.roomName && (!roomName || roomName === "Sala Privada")) {
+                roomName = data.roomName;
+                document.querySelector('.peer-details h2').textContent = roomName;
+            }
         }
         else if (data.type === 'history_sync') {
             // El primero que nos mandé el historial se queda.
@@ -413,6 +483,7 @@ function updateRoomUI() {
     if (count > 0 && !screenChat.classList.contains('active')) {
         screenConnection.classList.remove('active');
         screenChat.classList.add('active');
+        document.querySelector('.peer-details h2').textContent = roomName || "Sala Grupal";
         addMessage("🔐 Conectado a la Sala de forma segura.", "system");
         
         btnJoin.disabled = false;
@@ -433,20 +504,48 @@ function resetToConnectionScreen() {
     
     joinIdInput.value = '';
     btnCreate.classList.remove('hidden');
+    roomNameInput.classList.remove('hidden');
+    roomNameInput.value = '';
     myIdContainer.classList.add('hidden');
 }
 
 btnDisconnect.addEventListener('click', resetToConnectionScreen);
 
 btnInvite.addEventListener('click', () => {
-    navigator.clipboard.writeText(myId);
-    const originalText = btnInvite.innerHTML;
-    btnInvite.innerHTML = '<span class="icon">✅</span> Copiado';
-    setTimeout(() => {
-        btnInvite.innerHTML = originalText;
-        headerMenu.classList.add('hidden');
-    }, 2000);
+    shareModal.classList.remove('hidden');
+    headerMenu.classList.add('hidden');
 });
+
+function executeShareAction(withHistory) {
+    shareHistoryWithNext = withHistory;
+    shareModal.classList.add('hidden');
+    
+    const baseUrl = window.location.href.split('?')[0]; 
+    const inviteLink = `${baseUrl}?room=${myId}`;
+    const textPrefix = withHistory ? "Únete a mi sala P2P (incluye historial):" : "Únete a mi sala P2P privada:";
+
+    if (navigator.share) {
+        navigator.share({
+            title: roomName || 'Chat Nexus P2P',
+            text: textPrefix,
+            url: inviteLink
+        }).catch(err => console.log('Error sharing:', err));
+    } else {
+        navigator.clipboard.writeText(inviteLink);
+        alert('¡Enlace de invitación copiado! Pégalo en tu chat para invitar a tus amigos.');
+    }
+}
+
+btnShareWithHistory.addEventListener('click', () => executeShareAction(true));
+btnShareNoHistory.addEventListener('click', () => executeShareAction(false));
+btnCloseShare.addEventListener('click', () => shareModal.classList.add('hidden'));
+
+// Sincronizar el botón de compartir link de la pantalla de conexión también con el overlay
+if (btnShareLink) {
+    btnShareLink.addEventListener('click', () => {
+        shareModal.classList.remove('hidden');
+    });
+}
 
 // Lógica del Menú Desplegable
 if (btnMenuToggle) {

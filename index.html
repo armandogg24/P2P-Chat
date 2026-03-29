@@ -12,8 +12,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- PeerJS -->
+    <!-- PeerJS y QR Code -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -45,6 +46,7 @@
                 <div class="actions">
                     <div class="create-room">
                         <h3>Crear una Sala Privada</h3>
+                        <input type="text" id="room-name-input" placeholder="Nombre de la sala (opcional)..." style="margin-bottom: 15px;">
                         <button id="btn-create" class="btn primary">Generar Código de Sala</button>
                         <div id="my-id-container" class="hidden">
                             <p>Comparte este código con la otra persona:</p>
@@ -69,7 +71,10 @@
 
                     <div class="join-room">
                         <h3>Unirse a una Sala</h3>
-                        <input type="text" id="join-id" placeholder="Pega el código aquí...">
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <input type="text" id="join-id" placeholder="Pega el código aquí..." style="margin-bottom: 0; flex: 1;">
+                            <button id="btn-scan-qr" class="btn icon-btn secondary" title="Escanear QR" style="border-radius: 14px; width: 50px; height: 50px;">📷</button>
+                        </div>
                         <button id="btn-join" class="btn secondary">Conectarse</button>
                     </div>
                 </div>
@@ -93,12 +98,8 @@
                     <div class="header-actions">
                         <button id="btn-menu-toggle" class="btn icon-btn" title="Opciones">⋮</button>
                         <div id="header-menu" class="header-menu hidden">
-                            <label class="menu-item share-history-label">
-                                <input type="checkbox" id="share-history-cb" checked>
-                                <span>Pasar Historial</span>
-                            </label>
-                            <button id="btn-invite" class="menu-item-btn" title="Copiar código de invitación">
-                                <span class="icon">📋</span> Copiar Invitación
+                            <button id="btn-invite" class="menu-item-btn" title="Compartir invitación">
+                                <span class="icon">🔗</span> Compartir Invitación
                             </button>
                             <button id="btn-call" class="menu-item-btn" title="Iniciar Videollamada">
                                 <span class="icon">📹</span> Videollamada
@@ -158,20 +159,30 @@
         </div>
     </div>
 
-    <!-- Lightbox de Previsualización Multimedia -->
-    <div id="media-lightbox" class="lightbox hidden">
-        <div class="lightbox-overlay"></div>
-        <div class="lightbox-content">
-            <header class="lightbox-header">
-                <span id="lightbox-filename" class="filename">Archivo</span>
-                <div class="lightbox-actions">
-                    <a id="lightbox-download" href="#" download class="btn icon-btn" title="Descargar">⬇️</a>
-                    <button id="lightbox-close" class="btn icon-btn" title="Cerrar">✕</button>
-                </div>
-            </header>
-            <div id="lightbox-media-container" class="media-preview-box">
-                <!-- Se inserta img o video dinámicamente -->
+    <!-- Modal de Opciones de Compartir -->
+    <div id="share-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
+            <h3>Enviar Invitación</h3>
+            <p>¿Deseas incluir el historial actual del chat para los nuevos integrantes?</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button id="btn-share-with-history" class="btn primary">✅ Sí, enviar con historial</button>
+                <button id="btn-share-no-history" class="btn secondary">❌ No, solo invitación</button>
+                <button id="btn-close-share" class="btn danger" style="background: transparent; color: var(--text-muted);">Cancelar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal de Escáner QR -->
+    <div id="scanner-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content glass-panel" style="max-width: 500px; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>Escanear Código de Sala</h3>
+                <button id="btn-close-scanner" class="btn icon-btn danger" style="width: 30px; height: 30px; font-size: 0.8rem;">✕</button>
+            </div>
+            <div id="qr-reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000;"></div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; text-align: center;">Apunta a la pantalla con el código QR</p>
         </div>
     </div>
 

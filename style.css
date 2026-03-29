@@ -1042,3 +1042,93 @@ input[type="text"]:focus {
         background: rgba(15, 23, 42, 0.8);
     }
 }
+/* Estilos para Modales Genéricos */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-content {
+    position: relative;
+    z-index: 1;
+    width: 90%;
+    animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Ajustes para el Escáner QR */
+#qr-reader {
+    border: none !important;
+}
+
+#qr-reader__scan_region {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#qr-reader__dashboard {
+    padding: 15px !important;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#qr-reader button {
+    background: var(--primary) !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important;
+    transition: all 0.2s !important;
+}
+
+#qr-reader button:hover {
+    background: var(--primary-hover) !important;
+    transform: translateY(-2px);
+}
+
+#qr-reader select {
+    background: #1e293b !important;
+    color: white !important;
+    border: 1px solid var(--glass-border) !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    margin: 10px 0 !important;
+}
+
+/* Mejoras en el Header para Nombres Largos */
+.peer-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.peer-details h2 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Estilo para el input de nombre de sala en el panel */
+#room-name-input {
+    text-align: center;
+    font-weight: 500;
+}
