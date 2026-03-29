@@ -818,9 +818,21 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
         };
 
         audio.addEventListener('loadedmetadata', () => {
-            const dur = formatTime(audio.duration);
-            timeInfo.querySelector('.dur').textContent = dur;
-            seekBar.max = Math.floor(audio.duration);
+            if (audio.duration === Infinity) {
+                // Truco para forzar el cálculo de duración en Blobs de grabación (que no traen metadatos de duración)
+                audio.currentTime = 1e101;
+                audio.ontimeupdate = function() {
+                    this.ontimeupdate = null;
+                    audio.currentTime = 0;
+                    const dur = formatTime(audio.duration);
+                    timeInfo.querySelector('.dur').textContent = dur;
+                    seekBar.max = Math.floor(audio.duration);
+                };
+            } else {
+                const dur = formatTime(audio.duration);
+                timeInfo.querySelector('.dur').textContent = dur;
+                seekBar.max = Math.floor(audio.duration);
+            }
         });
 
         audio.addEventListener('timeupdate', () => {
