@@ -91,7 +91,10 @@
                             👥
                         </div>
                         <div class="peer-details">
-                            <h2>Sala Grupal</h2>
+                            <h2 style="display: flex; align-items: center; gap: 8px;">
+                                <span id="room-name-display">Sala Grupal</span>
+                                <button id="btn-return-to-call" class="btn icon-btn secondary hidden" title="Volver a la Llamada" style="width: 28px; height: 28px; font-size: 0.8rem;">📹</button>
+                            </h2>
                             <span id="connected-peer-id" class="peer-id-text">Participantes: 1</span>
                         </div>
                     </div>
@@ -126,16 +129,6 @@
                     <div class="call-actions">
                         <button id="btn-accept-call" class="btn-call-action accept" title="Aceptar">📹</button>
                         <button id="btn-decline-call" class="btn-call-action decline" title="Rechazar">❌</button>
-                    </div>
-                </div>
-
-                <div class="media-container hidden" id="media-container">
-                    <div class="video-grid" id="video-grid">
-                        <!-- Videos agregados dinámicamente -->
-                    </div>
-                    <div class="media-controls" style="display: flex; gap: 10px; margin-top: 10px;">
-                        <button id="btn-switch-camera" class="btn secondary" style="flex: 1;">🔄 Cambiar Cámara</button>
-                        <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar</button>
                     </div>
                 </div>
 
@@ -208,5 +201,22 @@
             });
         }
     </script>
+    <!-- Overlay de Videollamada Independiente (Aislado del Chat) -->
+    <div id="media-container" class="media-overlay hidden">
+        <div class="media-overlay-bg"></div>
+        <div class="media-overlay-content glass-panel">
+            <header class="media-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin:0;">📹 Videollamada Activa</h3>
+                <button id="btn-minimize-call" class="btn icon-btn" title="Minimizar (volver al chat)" style="background: rgba(255,255,255,0.1); width: 32px; height: 32px;">✕</button>
+            </header>
+            <div class="video-grid" id="video-grid">
+                <!-- Videos agregados dinámicamente -->
+            </div>
+            <div class="media-controls" style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="btn-switch-camera" class="btn secondary" style="flex: 1;">🔄 Cambiar Cámara</button>
+                <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar Llamada</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

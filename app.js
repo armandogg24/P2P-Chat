@@ -107,6 +107,8 @@ const recordingTimer = document.getElementById('recording-timer');
 const btnDiscardAudio = document.getElementById('btn-discard-audio');
 const btnSendRecordedAudio = document.getElementById('btn-send-recorded');
 const btnAudioCall = document.getElementById('btn-audio-call');
+const btnMinimizeCall = document.getElementById('btn-minimize-call');
+const btnReturnToCall = document.getElementById('btn-return-to-call');
 
 /**
  * =======================
@@ -1003,7 +1005,7 @@ function startLocalStream(stream, isAudioOnly = false) {
         localStream.getTracks().forEach(track => track.stop());
     }
     localStream = stream;
-    mediaContainer.classList.remove('hidden');
+    toggleVideoArea(true); // Mostrar overlay al iniciar stream
     
     const localVideoWrap = document.getElementById('video-wrap-local');
     if (localVideoWrap) {
@@ -1065,6 +1067,32 @@ btnSwitchCamera.addEventListener('click', () => {
         switchNextCamera();
     }
 });
+
+/**
+ * =======================
+ * NAVEGACIÓN VIDEO / CHAT
+ * =======================
+ */
+
+function toggleVideoArea(show) {
+    if (show) {
+        mediaContainer.classList.remove('hidden');
+        btnReturnToCall.classList.add('hidden');
+    } else {
+        mediaContainer.classList.add('hidden');
+        if (Object.keys(calls).length > 0 || localStream) {
+            btnReturnToCall.classList.remove('hidden');
+        }
+    }
+}
+
+if (btnMinimizeCall) {
+    btnMinimizeCall.addEventListener('click', () => toggleVideoArea(false));
+}
+
+if (btnReturnToCall) {
+    btnReturnToCall.addEventListener('click', () => toggleVideoArea(true));
+}
 
 /**
  * =======================
@@ -1276,4 +1304,5 @@ function endAllCalls() {
     // Limpiamos la UI
     videoGrid.innerHTML = '';
     mediaContainer.classList.add('hidden');
+    btnReturnToCall.classList.add('hidden');
 }
