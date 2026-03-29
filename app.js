@@ -817,21 +817,32 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
             }
         };
 
-        audio.addEventListener('loadedmetadata', () => {
-            if (audio.duration === Infinity) {
-                // Truco para forzar el cálculo de duración en Blobs de grabación (que no traen metadatos de duración)
-                audio.currentTime = 1e101;
-                audio.ontimeupdate = function() {
-                    this.ontimeupdate = null;
-                    audio.currentTime = 0;
-                    const dur = formatTime(audio.duration);
-                    timeInfo.querySelector('.dur').textContent = dur;
-                    seekBar.max = Math.floor(audio.duration);
-                };
-            } else {
+        const setDurationUI = () => {
+            if (audio.duration !== Infinity && !isNaN(audio.duration)) {
                 const dur = formatTime(audio.duration);
                 timeInfo.querySelector('.dur').textContent = dur;
                 seekBar.max = Math.floor(audio.duration);
+                return true;
+            }
+            return false;
+        };
+
+        audio.addEventListener('loadedmetadata', () => {
+            if (!setDurationUI()) {
+                audio.currentTime = 1e101;
+            }
+        });
+
+        audio.addEventListener('durationchange', setDurationUI);
+
+        audio.addEventListener('timeupdate', function fixDuration() {
+            if (audio.currentTime > 0 && audio.currentTime > (audio.duration || 0) && audio.duration !== Infinity) {
+                audio.currentTime = 0;
+                audio.removeEventListener('timeupdate', fixDuration);
+            }
+            if (setDurationUI() && audio.duration !== Infinity) {
+                // Si ya tenemos duración y no es infinita, y ya volvimos al inicio, podemos dejar de escuchar este evento específico
+                if (audio.currentTime === 0) audio.removeEventListener('timeupdate', fixDuration);
             }
         });
 
@@ -887,7 +898,7 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
 
 // Función auxiliar para formatear segundos (00:00)
 function formatTime(seconds) {
-    if (isNaN(seconds)) return "0:00";
+    if (isNaN(seconds) || seconds === Infinity) return "0:00";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
