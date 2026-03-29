@@ -1132,3 +1132,137 @@ input[type="text"]:focus {
     text-align: center;
     font-weight: 500;
 }
+/* Estilos para el Reproductor de Audio Personalizado */
+.custom-audio-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    padding: 10px 15px;
+    border-radius: 16px;
+    margin: 5px 0;
+    min-width: 260px;
+    backdrop-filter: blur(5px);
+}
+
+.audio-play-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding-left: 2px; /* Ajuste visual para el icono de play */
+}
+
+.audio-play-btn:hover {
+    background: var(--primary-hover);
+    transform: scale(1.05);
+}
+
+.audio-controls-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.audio-seek-bar {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.audio-seek-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
+.audio-seek-bar::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    background: white;
+}
+
+.audio-time-info {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    display: flex;
+    justify-content: space-between;
+}
+
+.audio-speed-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    min-width: 38px;
+}
+
+.audio-speed-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--primary);
+}
+
+/* Mejora de Iconos de Descarga */
+.file-dl-btn svg, .media-dl-overlay svg {
+    display: block;
+}
+
+.file-dl-btn {
+    text-decoration: none;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.file-dl-btn:hover {
+    background: var(--primary-hover);
+    border-color: transparent;
+    transform: translateY(-1px);
+}
+
+.media-dl-overlay {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.media-dl-overlay:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+}
+
+.file-download {
+    padding: 12px 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+}

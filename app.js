@@ -233,6 +233,11 @@ function proceedLogin() {
         screenLogin.classList.remove('active');
         screenConnection.classList.add('active');
         
+        // Solicitar permisos de notificación nativa
+        if ("Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+
         // Autoconectar si venimos de un enlace
         if (roomToJoin) {
             joinIdInput.value = roomToJoin;
@@ -445,15 +450,23 @@ function setupConnection(conn, isIncoming = false) {
         else if (data.type === 'text') {
             chatHistory.push({ content: data.content, senderPseudo: data.senderPseudo });
             addMessage(data.content, 'received', data.senderPseudo);
+            showNotification(`Mensaje de ${data.senderPseudo}`, data.content);
         } 
         else if (data.type === 'file') {
             chatHistory.push({ content: `[📎 Archivo Adjunto: ${data.filename}]`, senderPseudo: data.senderPseudo });
             addFileMessage(data.file, data.filetype, data.filename, 'received', data.senderPseudo, data.isVoiceNote);
+            showNotification(`Archivo de ${data.senderPseudo}`, data.filename);
         }
     });
 
     conn.on('close', () => removePeer(conn.peer));
     conn.on('error', () => removePeer(conn.peer));
+}
+
+function showNotification(title, body) {
+    if (document.visibilityState === 'hidden' && Notification.permission === "granted") {
+        new Notification(title, { body, icon: 'favicon.png' });
+    }
 }
 
 function removePeer(peerId) {
@@ -719,7 +732,7 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
         dlBtn.href = url;
         dlBtn.download = name;
         dlBtn.className = 'media-dl-overlay';
-        dlBtn.innerHTML = '⬇️';
+        dlBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
         dlBtn.title = 'Descargar';
         dlBtn.onclick = (e) => e.stopPropagation();
         
@@ -745,26 +758,97 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
             lightbox.classList.remove('hidden');
         });
     } else if (safeType.startsWith('audio/')) {
-        // Manejo de Audio (Música o Nota de Voz)
+        // Reproductor de Audio Personalizado con Velocidad y Mejor UI
         contentDiv.className = 'audio-msg-container';
+        
         const audio = document.createElement('audio');
         audio.src = url;
-        audio.controls = true;
-        contentDiv.appendChild(audio);
+        audio.preload = 'metadata';
+
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'custom-audio-player';
+        
+        const playBtn = document.createElement('button');
+        playBtn.className = 'audio-play-btn';
+        playBtn.innerHTML = '▶'; // Símbolo Play
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'audio-controls-info';
+
+        const seekBar = document.createElement('input');
+        seekBar.type = 'range';
+        seekBar.className = 'audio-seek-bar';
+        seekBar.value = 0;
+        seekBar.min = 0;
+        seekBar.max = 100;
+
+        const timeInfo = document.createElement('div');
+        timeInfo.className = 'audio-time-info';
+        timeInfo.innerHTML = '<span class="curr">0:00</span> / <span class="dur">0:00</span>';
+
+        infoDiv.appendChild(seekBar);
+        infoDiv.appendChild(timeInfo);
+
+        const speedBtn = document.createElement('button');
+        speedBtn.className = 'audio-speed-btn';
+        speedBtn.textContent = '1x';
+        const speeds = [1, 1.5, 2, 0.5];
+        let currentSpeedIdx = 0;
+        speedBtn.onclick = () => {
+            currentSpeedIdx = (currentSpeedIdx + 1) % speeds.length;
+            const newSpeed = speeds[currentSpeedIdx];
+            audio.playbackRate = newSpeed;
+            speedBtn.textContent = newSpeed + 'x';
+        };
+
+        playerDiv.appendChild(playBtn);
+        playerDiv.appendChild(infoDiv);
+        playerDiv.appendChild(speedBtn);
+        contentDiv.appendChild(playerDiv);
+
+        // Lógica del Reproductor
+        playBtn.onclick = () => {
+            if (audio.paused) {
+                audio.play();
+                playBtn.innerHTML = '⏸'; // Pausa
+            } else {
+                audio.pause();
+                playBtn.innerHTML = '▶';
+            }
+        };
+
+        audio.addEventListener('loadedmetadata', () => {
+            const dur = formatTime(audio.duration);
+            timeInfo.querySelector('.dur').textContent = dur;
+            seekBar.max = Math.floor(audio.duration);
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            seekBar.value = Math.floor(audio.currentTime);
+            timeInfo.querySelector('.curr').textContent = formatTime(audio.currentTime);
+        });
+
+        seekBar.oninput = () => {
+            audio.currentTime = seekBar.value;
+        };
+
+        audio.onended = () => {
+            playBtn.innerHTML = '▶';
+            seekBar.value = 0;
+        };
 
         if (!isVoiceNote) {
-            // Solo añadir botón de descarga si NO es una nota de voz
             const dlLink = document.createElement('a');
             dlLink.href = url;
             dlLink.download = name;
             dlLink.className = 'file-dl-btn';
             dlLink.style.marginTop = '10px';
             dlLink.style.display = 'flex';
-            dlLink.innerHTML = '⬇️ Descargar';
+            dlLink.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Descargar Audio`;
             contentDiv.appendChild(dlLink);
         }
     } else {
-        // Archivo genérico
+        // Archivo genérico con icono SVG mejorado
         const dlLink = document.createElement('div');
         dlLink.className = 'file-download';
         
@@ -773,7 +857,9 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
                 <span class="file-download-icon">📄</span>
                 <span class="file-name">${name}</span>
             </div>
-            <a href="${url}" download="${name}" class="file-dl-btn" title="Descargar">⬇️</a>
+            <a href="${url}" download="${name}" class="file-dl-btn" title="Descargar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </a>
         `;
         
         contentDiv.appendChild(dlLink);
@@ -785,6 +871,14 @@ function addFileMessage(fileData, type, name, sender, senderName = '', isVoiceNo
     chatMessages.appendChild(div);
     scrollToBottom();
     return div;
+}
+
+// Función auxiliar para formatear segundos (00:00)
+function formatTime(seconds) {
+    if (isNaN(seconds)) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
 }
 
 /**
@@ -951,7 +1045,7 @@ btnSwitchCamera.addEventListener('click', () => {
 
 /**
  * =======================
- * LÓGICA DE AUDIOS (HOLD TO RECORD)
+ * LÓGICA DE AUDIOS
  * =======================
  */
 
