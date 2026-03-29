@@ -206,15 +206,16 @@
         <div class="media-overlay-bg"></div>
         <div class="media-overlay-content glass-panel">
             <header class="media-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin:0;">📹 Videollamada Activa</h3>
+                <h3 id="media-call-title" style="margin:0;">📹 Videollamada Activa</h3>
                 <button id="btn-minimize-call" class="btn icon-btn" title="Minimizar (volver al chat)" style="background: rgba(255,255,255,0.1); width: 32px; height: 32px;">✕</button>
             </header>
             <div class="video-grid" id="video-grid">
                 <!-- Videos agregados dinámicamente -->
             </div>
             <div class="media-controls" style="display: flex; gap: 10px; margin-top: 20px;">
-                <button id="btn-switch-camera" class="btn secondary" style="flex: 1;">🔄 Cambiar Cámara</button>
-                <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar Llamada</button>
+                <button id="btn-toggle-video" class="btn secondary" style="flex: 1.5;">📹 Activar Video</button>
+                <button id="btn-switch-camera" class="btn secondary hidden" style="flex: 1;">🔄 Cámara</button>
+                <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar</button>
             </div>
         </div>
     </section>

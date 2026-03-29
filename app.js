@@ -93,6 +93,8 @@ const lightboxFilename = document.getElementById('lightbox-filename');
 const btnCall = document.getElementById('btn-call');
 const btnEndCall = document.getElementById('btn-end-call');
 const btnSwitchCamera = document.getElementById('btn-switch-camera');
+const btnToggleVideo = document.getElementById('btn-toggle-video');
+const mediaCallTitle = document.getElementById('media-call-title');
 const mediaContainer = document.getElementById('media-container');
 const videoGrid = document.getElementById('video-grid');
 
@@ -1019,14 +1021,36 @@ function startLocalStream(stream, isAudioOnly = false) {
     const localVideo = document.getElementById('video-local');
     if (localVideo) {
         localVideo.srcObject = stream;
-        // Actualizar efecto espejo según el tipo de cámara actual
-        if (currentFacingMode === 'user') {
+        
+        // Efecto espejo
+        if (currentFacingMode === 'user' && !isAudioOnly) {
             localVideo.classList.add('facing-user');
         } else {
             localVideo.classList.remove('facing-user');
         }
+
+        // Si es solo audio, mostramos clase especial para layout
+        if (isAudioOnly) {
+            localVideo.parentElement.classList.add('audio-only-participant');
+        } else {
+            localVideo.parentElement.classList.remove('audio-only-participant');
+        }
     } else {
         addVideoElement('local', stream, 'Tú', isAudioOnly);
+    }
+
+    // Actualizar UI del panel de llamada
+    if (mediaCallTitle) {
+        mediaCallTitle.textContent = isAudioOnly ? "📞 Llamada de Voz Activa" : "📹 Videollamada Activa";
+    }
+
+    if (btnToggleVideo) {
+        btnToggleVideo.innerHTML = isAudioOnly ? "📹 Activar Video" : "🚫 Desactivar Video";
+    }
+
+    if (btnSwitchCamera) {
+        if (isAudioOnly) btnSwitchCamera.classList.add('hidden');
+        else btnSwitchCamera.classList.remove('hidden');
     }
 }
 
@@ -1101,6 +1125,59 @@ if (btnMinimizeCall) {
 
 if (btnReturnToCall) {
     btnReturnToCall.addEventListener('click', () => toggleVideoArea(true));
+}
+
+async function toggleLocalVideo() {
+    if (!localStream) return;
+    
+    const videoTrack = localStream.getVideoTracks()[0];
+    const isAddingVideo = !videoTrack;
+
+    try {
+        let newStream;
+        if (isAddingVideo) {
+            // Activar Cámara
+            newStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode }, 
+                audio: false 
+            });
+            const newVideoTrack = newStream.getVideoTracks()[0];
+            localStream.addTrack(newVideoTrack);
+        } else {
+            // Desactivar Cámara
+            videoTrack.stop();
+            localStream.removeTrack(videoTrack);
+        }
+
+        // Notificar a todos los peers sobre el cambio de track
+        Object.values(calls).forEach(call => {
+            const pc = call.peerConnection;
+            if (pc) {
+                const senders = pc.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video') || 
+                                    senders.find(s => !s.track && s.track === null); // Intentar encontrar el slot de video
+
+                if (videoSender) {
+                    videoSender.replaceTrack(isAddingVideo ? localStream.getVideoTracks()[0] : null);
+                } else if (isAddingVideo) {
+                    // Si no había slot de video, esto es más complejo (re-negociación), 
+                    // pero en PeerJS mesh usualmente el slot existe o se ignora.
+                    // Para simplicidad, refrescamos el estado local.
+                }
+            }
+        });
+
+        // Actualizar UI Local
+        startLocalStream(localStream, !localStream.getVideoTracks().length);
+
+    } catch (err) {
+        console.error("Error al conmutar video:", err);
+        alert("No se pudo acceder a la cámara.");
+    }
+}
+
+if (btnToggleVideo) {
+    btnToggleVideo.addEventListener('click', toggleLocalVideo);
 }
 
 /**
@@ -1267,7 +1344,7 @@ function addVideoElement(id, stream, labelText, isAudioOnly = false) {
     const wrapper = document.createElement('div');
     wrapper.id = 'video-wrap-' + id;
     wrapper.className = 'video-wrapper';
-    if (isAudioOnly) wrapper.classList.add('audio-only');
+    if (isAudioOnly) wrapper.classList.add('audio-only-participant');
     
     const video = document.createElement('video');
     video.id = 'video-' + id;

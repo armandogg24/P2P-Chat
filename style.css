@@ -769,6 +769,36 @@ input[type="text"]:focus {
     object-fit: cover;
 }
 
+/* Estado de Solo Audio (Avatar en lugar de Video) */
+.audio-only-participant video {
+    display: none !important;
+}
+
+.audio-only-participant::before {
+    content: "🎙️";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    z-index: 1;
+    filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.5));
+    animation: pulseMic 2s infinite;
+}
+
+.audio-only-participant {
+    background: linear-gradient(135deg, #1e293b, #334155) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes pulseMic {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+}
+
 /* Efecto espejo para la cámara frontal local */
 #video-local.facing-user {
     transform: scaleX(-1);
