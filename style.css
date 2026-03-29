@@ -16,6 +16,10 @@
     --msg-received: #334155;
 }
 
+.hidden {
+    display: none !important;
+}
+
 * {
     margin: 0;
     padding: 0;

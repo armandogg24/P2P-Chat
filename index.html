@@ -18,9 +18,9 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app-container">
+    <main id="app-container">
         <!-- Pantalla de Login -->
-        <div id="login-screen" class="screen active">
+        <section id="login-screen" class="screen active">
             <div class="glass-panel" style="max-width: 450px; text-align: center; margin: 0 auto;">
                 <div class="logo-area">
                     <span class="logo-icon">👤</span>
@@ -32,10 +32,10 @@
                     <button id="btn-login" class="btn primary">Continuar</button>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Pantalla de Conexión -->
-        <div id="connection-screen" class="screen">
+        <section id="connection-screen" class="screen">
             <div class="glass-panel">
                 <div class="logo-area">
                     <span class="logo-icon">🔗</span>
@@ -79,11 +79,11 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Pantalla de Chat -->
-        <div id="chat-screen" class="screen">
-            <div class="chat-container glass-panel">
+        <section id="chat-screen" class="screen">
+            <article class="chat-container glass-panel">
                 <header class="chat-header">
                     <div class="peer-info">
                         <div class="avatar">
@@ -132,11 +132,11 @@
                     </div>
                 </div>
 
-                <div class="chat-messages" id="chat-messages">
+                <section class="chat-messages" id="chat-messages">
                     <div class="system-message">🔐 Conexión P2P establecida con éxito por WebRTC. La sala es totalmente privada.</div>
-                </div>
+                </section>
 
-                <div class="chat-input-area" id="chat-input-area">
+                <footer class="chat-input-area" id="chat-input-area">
                     <input type="file" id="file-input" class="hidden">
                     <button id="btn-discard-audio" class="btn icon-btn danger-btn hidden" title="Descartar audio">🗑️</button>
                     <button id="btn-attach" class="btn icon-btn upload-btn" title="Enviar Foto/Video/Archivo">📎</button>
@@ -147,13 +147,13 @@
                     <button id="btn-record" class="btn icon-btn record-btn" title="Grabar audio">🎤</button>
                     <button id="btn-send-recorded" class="btn icon-btn primary hidden" title="Enviar grabado">➤</button>
                     <button id="btn-send" class="btn primary icon-btn send-btn" title="Enviar">➤</button>
-                </div>
-            </div>
-        </div>
-    </div>
+                </footer>
+            </article>
+        </section>
+    </main>
 
     <!-- Modal de Opciones de Compartir -->
-    <div id="share-modal" class="modal hidden">
+    <aside id="share-modal" class="modal hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
             <h3>Enviar Invitación</h3>
@@ -164,10 +164,10 @@
                 <button id="btn-close-share" class="btn danger" style="background: transparent; color: var(--text-muted);">Cancelar</button>
             </div>
         </div>
-    </div>
+    </aside>
 
     <!-- Modal de Escáner QR -->
-    <div id="scanner-modal" class="modal hidden">
+    <aside id="scanner-modal" class="modal hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content glass-panel" style="max-width: 500px; padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -177,9 +177,9 @@
             <div id="qr-reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000;"></div>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; text-align: center;">Apunta a la pantalla con el código QR</p>
         </div>
-    </div>
+    </aside>
 
-    <script src="app.js"></script>
+
     <script>
         // Registro del Service Worker para PWA con forzado de actualización
         if ('serviceWorker' in navigator) {
@@ -202,7 +202,7 @@
         }
     </script>
     <!-- Overlay de Videollamada Independiente (Aislado del Chat) -->
-    <div id="media-container" class="media-overlay hidden">
+    <section id="media-container" class="media-overlay hidden">
         <div class="media-overlay-bg"></div>
         <div class="media-overlay-content glass-panel">
             <header class="media-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -217,6 +217,7 @@
                 <button id="btn-end-call" class="btn danger" style="flex: 1;">Finalizar Llamada</button>
             </div>
         </div>
-    </div>
+    </section>
+    <script src="app.js"></script>
 </body>
 </html>

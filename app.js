@@ -263,7 +263,8 @@ usernameInput.addEventListener('keypress', (e) => {
 
 btnCreate.addEventListener('click', () => {
     roomName = roomNameInput.value.trim() || "Sala Privada";
-    document.querySelector('.peer-details h2').textContent = roomName;
+    const roomNameDisplay = document.getElementById('room-name-display');
+    if (roomNameDisplay) roomNameDisplay.textContent = roomName;
     btnCreate.classList.add('hidden');
     roomNameInput.classList.add('hidden');
     myIdContainer.classList.remove('hidden');
@@ -427,7 +428,8 @@ function setupConnection(conn, isIncoming = false) {
             // Si el peer que nos contacta trae el nombre de la sala y aún no tenemos uno amigable, lo usamos
             if (data.roomName && (!roomName || roomName === "Sala Privada")) {
                 roomName = data.roomName;
-                document.querySelector('.peer-details h2').textContent = roomName;
+                const roomNameDisplay = document.getElementById('room-name-display');
+                if (roomNameDisplay) roomNameDisplay.textContent = roomName;
             }
         }
         else if (data.type === 'history_sync') {
@@ -498,7 +500,8 @@ function updateRoomUI() {
     if (count > 0 && !screenChat.classList.contains('active')) {
         screenConnection.classList.remove('active');
         screenChat.classList.add('active');
-        document.querySelector('.peer-details h2').textContent = roomName || "Sala Grupal";
+        const roomNameDisplay = document.getElementById('room-name-display');
+        if (roomNameDisplay) roomNameDisplay.textContent = roomName || "Sala Grupal";
         addMessage("🔐 Conectado a la Sala de forma segura.", "system");
         
         btnJoin.disabled = false;
